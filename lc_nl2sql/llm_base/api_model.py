@@ -34,7 +34,7 @@ from transformers import HfArgumentParser
 
 import vertexai
 from vertexai.generative_models import GenerativeModel
-from lc_nl2sql.llm_base.api_model import BaseModel
+from lc_nl2sql.llm_base.model import BaseModel
 
 import logging
 

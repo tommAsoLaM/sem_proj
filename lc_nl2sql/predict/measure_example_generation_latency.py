@@ -28,8 +28,10 @@ from lc_nl2sql.configs.config import EXAMPLE_GENERATOR, EXAMPLE_GENERATOR2
 from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict.predict import prepare_dataset
+from lc_nl2sql.llm_base.model import BaseModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 
-def measure_example_generaitn_latency(model: GeminiModel, predict_data: List[Dict], n=100):
+def measure_example_generaitn_latency(model: BaseModel, predict_data: List[Dict], n=100):
     def generate_k_examples(schema, k, diverse_set=True):
         num_generated_examples = 0
         examples = ""
@@ -61,7 +63,7 @@ def measure_example_generaitn_latency(model: GeminiModel, predict_data: List[Dic
     return latency
 
 
-def predict(model: GeminiModel, dump_file=True):
+def predict(model: BaseModel, dump_file=True):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
     predict_data = prepare_dataset(args.predicted_input_filename)
@@ -77,6 +79,6 @@ def predict(model: GeminiModel, dump_file=True):
 
 
 if __name__ == "__main__":
-    model = GeminiModel()
+    model = OfflineModel()
     model._infer_args()
     predict(model)

@@ -35,6 +35,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from lc_nl2sql.third_party.db_gpt_hub_sql.data_process.data_utils import extract_sql_prompt_dataset
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.llm_base.offline_model import OfflineModel
+from lc_nl2sql.llm_base.model import BaseModel
 
 
 def prepare_dataset(predict_file_path: Optional[str] = None, ) -> List[Dict]:
@@ -92,7 +93,7 @@ def inference_worker(
     except FunctionTimedOut:
         return ("", 0, 0, 0, 0, 0, 0)
 
-def parallelized_inference(model: GeminiModel, predict_data: List[Dict],
+def parallelized_inference(model: BaseModel, predict_data: List[Dict],
                            **input_kwargs):
     num_threads = 50
     if model.generating_args.num_beams > 10:
@@ -153,7 +154,7 @@ def parallelized_inference(model: GeminiModel, predict_data: List[Dict],
     return [res_dict[i] for i in range(len(predict_data))], extra_tokens, n_tries, latency, verify_latency, e2e_latency
 
 
-def predict(model: GeminiModel, dump_file=True):
+def predict(model: BaseModel, dump_file=True):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
     predict_data = prepare_dataset(args.predicted_input_filename)
@@ -190,6 +191,6 @@ def predict(model: GeminiModel, dump_file=True):
 
 
 if __name__ == "__main__":
-    model = GeminiModel()
+    model = OfflineModel()
     model._infer_args()
     predict(model)

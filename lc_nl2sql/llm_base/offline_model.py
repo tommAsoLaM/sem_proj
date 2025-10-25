@@ -6,6 +6,7 @@ from transformers import Any, AutoModelForCausalLM, HfArgumentParser, Optional, 
 from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
+from typing import Generator, List, Tuple
 
 class OfflineModel(BaseModel):
     def __init__(self, model_name:str = "meta-llama/Llama-3.2-1B"):
@@ -72,3 +73,116 @@ class OfflineModel(BaseModel):
             max_new_tokens = 512,
             do_sample = False
         )
+
+
+    def chat(self,
+        query: str,
+        history: Optional[List[Tuple[str, str]]] = None,
+        system: Optional[str] = None,
+        **input_kwargs) -> Tuple[str, Tuple[int, int]]:
+        """Generate a response using the local model."""
+        try:
+            # Construct prompt from components
+            full_prompt = ""
+            if system:
+                full_prompt += f"{system}\n"
+            if history:
+                for past_query, past_response in history:
+                    full_prompt += f"User: {past_query}\nAssistant: {past_response}\n"
+            full_prompt += f"User: {query}\nAssistant:"
+
+            # Get token count before generation
+            input_tokens = len(self.tokenizer.encode(full_prompt))
+                
+            # Generate response using local pipeline
+            outputs = self.pipeline(
+                full_prompt,
+                return_full_text=False,
+                **input_kwargs
+            )
+            generated_text = outputs[0]['generated_text']
+                
+            # Count output tokens
+            output_tokens = len(self.tokenizer.encode(generated_text))
+                
+            return generated_text, (input_tokens, output_tokens)
+        except Exception as e:
+            logging.error(f"Local generation error: {str(e)}")
+            return "", (0, 0)
+
+    def stream_chat(self,
+                   query: str, 
+                   history: Optional[List[Tuple[str, str]]] = None,
+                   system: Optional[str] = None,
+                   **input_kwargs) -> Generator[str, None, None]:
+        """Stream responses using local model."""
+        try:
+            # Use existing pipeline with streaming
+            full_prompt = f"{system}\n" if system else ""
+            if history:
+                for q, a in history:
+                    full_prompt += f"User: {q}\nAssistant: {a}\n"
+            full_prompt += f"User: {query}\nAssistant:"
+
+            # Generate text in chunks
+            for output in self.pipeline(
+                full_prompt,
+                return_full_text=False,
+                max_new_tokens=4,  # Small chunks for streaming
+                **input_kwargs
+            ):
+                yield output[0]['generated_text']
+        except Exception as e:
+            logging.error(f"Local streaming error: {str(e)}")
+            yield ""
+
+    def verify_and_correct(self, 
+                          query: str,
+                          sql: str,
+                          db_folder_path: str,
+                          qid: int,
+                          return_invalid: bool = True,
+                          use_flash: bool = False) -> Tuple[str, int, int]:
+        """Verify SQL locally without API calls."""
+        verification_prompt = f"""
+        Verify this SQL query:
+        Question: {query}
+        SQL: {sql}
+        Check for syntax errors and semantic correctness.
+        Provide corrected SQL if needed.
+        """
+        
+        response, (input_tokens, output_tokens) = self.chat(verification_prompt)
+        
+        # Extract corrected SQL from response
+        # Assuming response contains the SQL query
+        corrected_sql = sql  # Default to original if no correction found
+        if "SELECT" in response:
+            corrected_sql = response.strip()
+            
+        return corrected_sql, input_tokens, output_tokens
+
+    def majority_voting(self, query: str, candidates: List[str]) -> str:
+        """Local implementation of majority voting."""
+        if not candidates:
+            return ""
+        
+        # Simple voting prompt
+        voting_prompt = (
+            f"Question: {query}\n"
+            "Choose the most correct SQL query:\n"
+            + "\n".join(f"{i+1}. {c}" for i, c in enumerate(candidates))
+            + "\nReturn the number of the best query."
+        )
+        
+        response, _ = self.chat(voting_prompt)
+        
+        # Try to extract a number from response
+        try:
+            chosen = int(''.join(filter(str.isdigit, response.strip()))) - 1
+            if 0 <= chosen < len(candidates):
+                return candidates[chosen]
+        except (ValueError, IndexError):
+            pass
+            
+        return candidates[0]  # Default to first candidate

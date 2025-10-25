@@ -26,8 +26,9 @@ from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.llm_base.offline_model import OfflineModel
 from lc_nl2sql.predict.predict import prepare_dataset
+from lc_nl2sql.llm_base.model import BaseModel
 
-def count_token(model: str, predict_data: List[Dict], sample=True):
+def count_token(model: BaseModel, predict_data: List[Dict], sample=True):
     tok_cnts = []
     if isinstance(model, GeminiModel):
         model = GeminiModel()
@@ -51,7 +52,7 @@ def count_token(model: str, predict_data: List[Dict], sample=True):
     return tok_cnts
 
 
-def predict(model: GeminiModel, dump_file=True):
+def predict(model: BaseModel, dump_file=True):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
     predict_data = prepare_dataset(args.predicted_input_filename)
@@ -67,6 +68,6 @@ def predict(model: GeminiModel, dump_file=True):
 
 
 if __name__ == "__main__":
-    model = GeminiModel()
+    model = OfflineModel()
     model._infer_args()
     predict(model)
