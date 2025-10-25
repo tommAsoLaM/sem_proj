@@ -24,10 +24,17 @@ sys.path.append(ROOT_PATH)
 
 from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 from lc_nl2sql.predict.predict import prepare_dataset
 
-def count_token(model: GeminiModel, predict_data: List[Dict], sample=True):
+def count_token(model: str, predict_data: List[Dict], sample=True):
     tok_cnts = []
+    if isinstance(model, GeminiModel):
+        model = GeminiModel()
+        model._load_model()
+    else:
+        model = OfflineModel()
+        model.load_model()
     for i, item in enumerate(predict_data):
         if sample and i % 5 != 0:
             # Counting based on every other five questions

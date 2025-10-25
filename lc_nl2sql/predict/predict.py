@@ -34,6 +34,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from lc_nl2sql.third_party.db_gpt_hub_sql.data_process.data_utils import extract_sql_prompt_dataset
 from lc_nl2sql.llm_base.api_model import GeminiModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 
 
 def prepare_dataset(predict_file_path: Optional[str] = None, ) -> List[Dict]:
