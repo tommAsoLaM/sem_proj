@@ -7,6 +7,7 @@ from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
 from typing import Generator, List, Tuple
+import re
 
 class OfflineModel(BaseModel):
     def __init__(self, model_name:str = "meta-llama/Llama-3.2-1B"):
@@ -101,14 +102,21 @@ class OfflineModel(BaseModel):
                 **input_kwargs
             )
             generated_text = outputs[0]['generated_text']
-                
+            sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", generated_text, re.IGNORECASE)
+            if sql_match:
+                final_response = sql_match.group(1).strip()
+            elif "SELECT" in generated_text.upper():
+                # Fallback: simple strip if no code block is found
+                final_response = generated_text.strip()
+            else:
+                final_response = generated_text.strip()
             # Count output tokens
-            output_tokens = len(self.tokenizer.encode(generated_text))
+            output_tokens = len(self.tokenizer.encode(final_response))
                 
             return generated_text, (input_tokens, output_tokens)
         except Exception as e:
             logging.error(f"Local generation error: {str(e)}")
-            return "", (0, 0)
+            return final_response, (input_tokens, output_tokens)
 
     def stream_chat(self,
                    query: str, 
@@ -154,11 +162,19 @@ class OfflineModel(BaseModel):
         
         response, (input_tokens, output_tokens) = self.chat(verification_prompt)
         
-        # Extract corrected SQL from response
-        # Assuming response contains the SQL query
-        corrected_sql = sql  # Default to original if no correction found
-        if "SELECT" in response:
+        sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", response, re.IGNORECASE)
+        if sql_match:
+            # Extract the captured group (the content inside the fences)
+            corrected_sql = sql_match.group(1).strip()
+            
+        elif "SELECT" in response.upper():
+            # Fallback: If no code block, return the stripped response 
+            # (assuming the LLM outputted only the SQL, which is a weak assumption)
             corrected_sql = response.strip()
+            
+        else:
+            # Default to the original SQL if correction failed or model provided no new query
+            corrected_sql = sql
             
         return corrected_sql, input_tokens, output_tokens
 

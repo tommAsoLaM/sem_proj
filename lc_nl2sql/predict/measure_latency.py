@@ -34,6 +34,7 @@ from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict.predict import prepare_dataset
 from lc_nl2sql.llm_base.model import BaseModel
 from lc_nl2sql.llm_base.offline_model import OfflineModel
+import logging
 
 
 def measure(
@@ -48,7 +49,7 @@ def measure(
             latency = time.time() - start_time
             return latency, token
         except Exception as e:
-            loging.error(e)
+            logging.error(e)
             return 0, 0
     try:
         return func_timeout(300, _task, args=())
