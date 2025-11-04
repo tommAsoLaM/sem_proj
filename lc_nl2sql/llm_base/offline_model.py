@@ -1,12 +1,11 @@
 import logging
 from typing import Dict
 import torch
-from transformers import Any, AutoModelForCausalLM, HfArgumentParser, Optional, pipeline, AutoTokenizer
-
+from transformers import AutoModelForCausalLM, HfArgumentParser, Pipeline, AutoTokenizer
 from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
-from typing import Generator, List, Tuple
+from typing import Generator, List, Tuple, Any, Optional
 import re
 
 class OfflineModel(BaseModel):
@@ -64,7 +63,7 @@ class OfflineModel(BaseModel):
         )
 
         self.model.eval()
-        self.pipeline = pipeline(
+        self.pipeline = Pipeline(
             "text-generation",
             model = self.model,
             tokenizer=self.tokenizer,

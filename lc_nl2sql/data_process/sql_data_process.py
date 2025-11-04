@@ -26,7 +26,6 @@ import random
 import pickle
 import numpy as np
 from tqdm import tqdm
-import pandas as pd
 
 ROOT_PATH = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
