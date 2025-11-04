@@ -38,6 +38,8 @@ from lc_nl2sql.configs.config import (BASIC_INSTRUCTION_PROMPT,
                                       DATA_PATH, EXAMPLE_GENERATOR2, 
                                       COLUMN_SELECTOR_TEMPLATE)
 from lc_nl2sql.llm_base.api_model import GeminiModel
+from lc_nl2sql.llm_base.model import BaseModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 
 
 class ProcessSqlData:
@@ -58,7 +60,7 @@ class ProcessSqlData:
         num_col_values=10,
         filtered_schema_file="",
         db_tbl_col_vals_file="",
-        vertex_ai_project_id="",
+        #vertex_ai_project_id="",
         tbr_selection_file="",
         use_hint=True,
         use_rules=False,
@@ -108,7 +110,7 @@ class ProcessSqlData:
         self.source_type = source_type
 
         self.emb_model = None
-        self.model = GeminiModel(vertex_ai_project_id)
+        self.model = OfflineModel()
 
     def decode_json_file_with_ddl(self, data_file_list, table_file,
                                   db_folder_path, db_id_name, output_name,
@@ -386,7 +388,7 @@ class ProcessSqlData:
             prompt = COLUMN_SELECTOR_TEMPLATE.format(DATABASE_SCHEMA=schema,
                                                      QUESTION=question,
                                                      HINT=hint)
-            return self.model._generate_sql(prompt)
+            return self.model.chat(query=prompt)
 
         def generate_k_examples(schema, k, diverse_set=True):
             num_generated_examples = 0
@@ -397,7 +399,7 @@ class ProcessSqlData:
                     prompt = EXAMPLE_GENERATOR2.format(schema=schema, k=_k)
                 else:
                     prompt = EXAMPLE_GENERATOR.format(schema, _k)
-                _examples, _ = self.model._generate_sql(prompt, use_flash=self.use_flash)
+                _examples, _ = self.model.chat(prompt)
                 num_generated_examples += len(_examples.split("\"input\":"))
                 examples += "\n" + _examples
             
