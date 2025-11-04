@@ -746,7 +746,7 @@ if __name__ == "__main__":
         num_col_values=int(args.num_col_values),
         filtered_schema_file=args.filtered_schema_file,
         db_tbl_col_vals_file=args.db_tbl_col_vals_file,
-        vertex_ai_project_id="400355794761",  # change appropriately
+        #vertex_ai_project_id="400355794761",  # change appropriately
         tbr_selection_file=args.tbr_selection_file,
         use_hint=bool(int(args.use_hint)),
         use_rules=bool(int(args.use_rules)),

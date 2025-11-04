@@ -28,6 +28,8 @@ from lc_nl2sql.third_party.db_gpt_hub_sql.data_process.data_utils import extract
 from lc_nl2sql.data_process.sql_data_process import ProcessSqlData
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict import predict
+from lc_nl2sql.llm_base.model import BaseModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 
 def main():
     parser = argparse.ArgumentParser()
@@ -83,7 +85,7 @@ def main():
         vertex_ai_project_id=args.vertex_ai_project_id,
     )
 
-    model = GeminiModel(project_id=args.vertex_ai_project_id)
+    model = OfflineModel()
     model._infer_args({"temperature": float(args.temperature),
                        "db_folder_path": args.db_folder_path,
                        "db_tbl_col_vals_file": args.db_tbl_col_vals_file})
