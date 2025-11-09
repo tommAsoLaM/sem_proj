@@ -55,12 +55,7 @@ class OfflineModel(BaseModel):
     def load_model(self):
         print(f"loading the model: {self.model_name} on {self.device}...")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-        self.model_name,
-        device_map="auto",
-        torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-        trust_remote_code=True
-        )
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
 
         self.model.eval()
         self.pipeline = Pipeline(
