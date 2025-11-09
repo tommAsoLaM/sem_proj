@@ -1,7 +1,7 @@
 import logging
 from typing import Dict
 import torch
-from transformers import AutoModelForCausalLM, HfArgumentParser, Pipeline, AutoTokenizer
+from transformers import AutoModelForCausalLM, HfArgumentParser, pipeline, AutoTokenizer
 from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
@@ -9,7 +9,7 @@ from typing import Generator, List, Tuple, Any, Optional
 import re
 
 class OfflineModel(BaseModel):
-    def __init__(self, model_name:str = "meta-llama/Llama-3.2-1B"):
+    def __init__(self, model_name:str = "HuggingFaceTB/SmolLM-135M-Instruct"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model_name = model_name
         self.model = None
@@ -58,7 +58,7 @@ class OfflineModel(BaseModel):
         self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
 
         self.model.eval()
-        self.pipeline = Pipeline(
+        self.pipeline = pipeline(
             "text-generation",
             model = self.model,
             tokenizer=self.tokenizer,
