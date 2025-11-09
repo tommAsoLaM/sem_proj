@@ -29,7 +29,7 @@ from lc_nl2sql.data_process.sql_data_process import ProcessSqlData
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict import predict
 from lc_nl2sql.llm_base.model import BaseModel
-from lc_nl2sql.llm_base.offline_model import OfflineModel
+from new_files.offline_model import OfflineModel
 
 def main():
     parser = argparse.ArgumentParser()

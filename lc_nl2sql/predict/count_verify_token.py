@@ -28,7 +28,7 @@ from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict.predict import prepare_dataset, extract_output
 from lc_nl2sql.llm_base.model import BaseModel
-from lc_nl2sql.llm_base.offline_model import OfflineModel
+from new_files.offline_model import OfflineModel
 
 def count_token(model: BaseModel, predict_data: List[Dict], output_sqls: List[str], sample=True):
     tok_cnts = []
