@@ -100,6 +100,7 @@ class OfflineModel(BaseModel):
                 **input_kwargs
             )
             generated_text = outputs[0]['generated_text']
+            print("text generation done")
             sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", generated_text, re.IGNORECASE)
             if sql_match:
                 final_response = sql_match.group(1).strip()
@@ -110,6 +111,7 @@ class OfflineModel(BaseModel):
                 final_response = generated_text.strip()
             # Count output tokens
             output_tokens = len(self.tokenizer.encode(final_response))
+            print("text checked")
                 
             return generated_text, (input_tokens, output_tokens)
         except Exception as e:
