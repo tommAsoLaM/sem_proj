@@ -24,7 +24,7 @@ sys.path.append(ROOT_PATH)
 
 from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
-from new_files.offline_model import OfflineModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 from lc_nl2sql.predict.predict import prepare_dataset
 from lc_nl2sql.llm_base.model import BaseModel
 
