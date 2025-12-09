@@ -7,6 +7,7 @@ from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArgument
 from lc_nl2sql.llm_base.model import BaseModel
 from typing import Generator, List, Tuple, Any, Optional
 import re
+from kvpress import KnormPress, SnapKVPress, StreamingLLMPress, TOVARIPress, SimLayerPress
 
 class OfflineModel(BaseModel):
     def __init__(self, model_name:str = "HuggingFaceTB/SmolLM-135M-Instruct"):
@@ -16,6 +17,7 @@ class OfflineModel(BaseModel):
         self.tokenizer = None
         self.pipeline = None
         self.ignore_hints = False
+        self.press = None
         self.load_model()
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None)-> None:
@@ -59,7 +61,10 @@ class OfflineModel(BaseModel):
             self.model_name,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto" if torch.cuda.is_available() else None,
+            trust_remote_code=True
         )
+        print("Applying KVPress compression...")
+        self.press = KnormPress(compression_ratio=0.4)  
 
         self.model.eval()
         self.pipeline = pipeline(
@@ -94,11 +99,20 @@ class OfflineModel(BaseModel):
             input_tokens = len(self.tokenizer.encode(full_prompt))
                 
             # Generate response using local pipeline
-            outputs = self.pipeline(
-                full_prompt,
-                return_full_text=False,
-                **input_kwargs
-            )
+            if self.press:
+                with self.press(self.model):
+                    outputs = self.pipeline(
+                        full_prompt,
+                        return_full_text=False,
+                        **input_kwargs
+                    )
+            else:
+                # Fallback if KVPress is not loaded
+                outputs = self.pipeline(
+                    full_prompt,
+                    return_full_text=False,
+                    **input_kwargs
+                )
             generated_text = outputs[0]['generated_text']
             print("text generation done")
             sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", generated_text, re.IGNORECASE)
