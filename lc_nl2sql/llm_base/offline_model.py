@@ -7,7 +7,7 @@ from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArgument
 from lc_nl2sql.llm_base.model import BaseModel
 from typing import Generator, List, Tuple, Any, Optional
 import re
-from kvpress import KnormPress, SnapKVPress, StreamingLLMPress
+from kvpress import KnormPress, SnapKVPress
 
 class OfflineModel(BaseModel):
     def __init__(self, model_name:str = "HuggingFaceTB/SmolLM-135M-Instruct"):
