@@ -21,20 +21,15 @@ import time
 import re
 import random
 import pickle
-
-from func_timeout import func_timeout, FunctionTimedOut
-
-ROOT_PATH = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(ROOT_PATH)
-
+import argparse
 from tqdm import tqdm
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from func_timeout import func_timeout, FunctionTimedOut
 
 from lc_nl2sql.third_party.db_gpt_hub_sql.data_process.data_utils import extract_sql_prompt_dataset
 from lc_nl2sql.llm_base.api_model import GeminiModel
-from new_files.offline_model import OfflineModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
 from lc_nl2sql.llm_base.model import BaseModel
 
 
