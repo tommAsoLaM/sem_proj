@@ -7,7 +7,8 @@ from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArgument
 from lc_nl2sql.llm_base.model import BaseModel
 from typing import Generator, List, Tuple, Any, Optional
 import re
-from kvpress import KnormPress, SnapKVPress
+from kvpress import KnormPress, SnapKVPress, ExpectedAttentionPress
+from flash_attn import flash_attn_func
 
 class OfflineModel(BaseModel):
     def __init__(self, model_name:str = "HuggingFaceTB/SmolLM-135M-Instruct"):
@@ -17,7 +18,8 @@ class OfflineModel(BaseModel):
         self.tokenizer = None
         self.pipeline = None
         self.ignore_hints = False
-        self.press = None
+        self.presses = []
+        self.chosen_press = None
         self.load_model()
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None)-> None:
@@ -64,7 +66,10 @@ class OfflineModel(BaseModel):
             trust_remote_code=True
         )
         print("Applying KVPress compression...")
-        self.press = KnormPress(compression_ratio=0.4)  
+        self.presses.append({"name":"knormPress", "press":KnormPress(compression_ratio = 0.4)})
+        self.presses.append({"name":"SnapKVPress", "press":SnapKVPress(compression_ratio = 0.4)})
+        self.presses.append({"name":"ExpectedAttentionPress", "press":ExpectedAttentionPress(compression_ratio = 0.4)})
+        self.chosen_press = self.presses[0]["press"]
 
         self.model.eval()
         self.pipeline = pipeline(
@@ -84,25 +89,37 @@ class OfflineModel(BaseModel):
         history: Optional[List[Tuple[str, str]]] = None,
         system: Optional[str] = None,
         **input_kwargs) -> Tuple[str, Tuple[int, int]]:
-        """Generate a response using the local model."""
+        
         try:
             # Construct prompt from components
-            full_prompt = ""
-            if system:
-                full_prompt += f"{system}\n"
+            # full_prompt = ""
+            # if system:
+            #     full_prompt += f"{system}\n"
+            # if history:
+            #     for past_query, past_response in history:
+            #         full_prompt += f"User: {past_query}\nAssistant: {past_response}\n"
+            messages = []
+
+            messages.append({"role": "system", "content": system})
             if history:
                 for past_query, past_response in history:
-                    full_prompt += f"User: {past_query}\nAssistant: {past_response}\n"
-            full_prompt += f"User: {query}\nAssistant:"
+                    messages.append({"role": "user", "content": past_query})
+                    messages.append({"role": "assistant", "content": past_response})
 
+            # full_prompt += f"User: {query}\nAssistant:"
+            messages.append({"role": "user", "content": query})
+            full_prompt = self.tokenizer.apply_chat_template(messages, tokenize = False, add_generation_prompt = True)
             # Get token count before generation
-            input_tokens = len(self.tokenizer.encode(full_prompt))
+            input_tokens = len(self.tokenizer.encode(full_prompt, add_special_tokens = False)[0])
                 
             # Generate response using local pipeline
-            if self.press:
-                with self.press(self.model):
+            if self.chosen_press:
+                context = system + "\n" + "\n".join([past_query, past_response] for past_query, past_response in history)
+                print(f"context : {context}")
+                with self.chosen_press(self.model):
                     outputs = self.pipeline(
-                        full_prompt,
+                        context = context,
+                        question = query,
                         return_full_text=False,
                         **input_kwargs
                     )
@@ -114,7 +131,7 @@ class OfflineModel(BaseModel):
                     **input_kwargs
                 )
             generated_text = outputs[0]['generated_text']
-            print("text generation done")
+            print(f"text generation done: {generated_text}")
             sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", generated_text, re.IGNORECASE)
             if sql_match:
                 final_response = sql_match.group(1).strip()
@@ -125,7 +142,6 @@ class OfflineModel(BaseModel):
                 final_response = generated_text.strip()
             # Count output tokens
             output_tokens = len(self.tokenizer.encode(final_response))
-            print("text checked")
                 
             return generated_text, (input_tokens, output_tokens)
         except Exception as e:
