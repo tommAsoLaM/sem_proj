@@ -248,8 +248,9 @@ class FinetuningArguments:
     stage: Optional[Literal["sft", "rm"]] = field(
         default="sft", metadata={"help": "Which stage will be performed in training."}
     )
-    finetuning_type: Optional[Literal["lora", "freeze", "full", "none"]] = field(
-        default="lora", metadata={"help": "Which fine-tuning method to use."}
+    per_device_eval_batch_size: Optional[int] = field(
+        default=2,
+        metadata={"help": "Batch size per device for evaluation."}
     )
     num_hidden_layers: Optional[int] = field(
         default=32,
