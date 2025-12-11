@@ -26,8 +26,8 @@ except ImportError:
 # [NEW] Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
-    # Example default policy (e.g. SnapKV), change as needed
-    from kvpress import SnapKVPress 
+    
+    from kvpress import KVPress, KNormPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -47,9 +47,9 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.use_kvpress = False
+        self.use_kvpress = True
         # You can change default self_attn_func here
-        self.kvpress_policy = SnapKVPress(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = KNormPress(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
