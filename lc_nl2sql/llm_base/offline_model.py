@@ -1,28 +1,82 @@
+import pickle
+import sqlite3
 import logging
-from typing import Dict
+import re
+import os
 import torch
-from transformers import AutoModelForCausalLM, HfArgumentParser, pipeline, AutoTokenizer
+import pandas as pd
+from typing import Any, Dict, Generator, List, Optional, Tuple
+
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, HfArgumentParser
+
+from lc_nl2sql.configs.config import (CHECKER_TEMPLATE, LITERAL_ERROR_TEMPLATE,
+                                      MAJORITY_VOTING, VERIFY_ANSWER)
 from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
-from typing import Generator, List, Tuple, Any, Optional
-import re
-from kvpress import KnormPress, SnapKVPress, ExpectedAttentionPress
-from flash_attn import flash_attn_func
+
+# Konfigurasi Logging
+logging.basicConfig(level=logging.INFO)
 
 class OfflineModel(BaseModel):
-    def __init__(self, model_name:str = "HuggingFaceTB/SmolLM-135M-Instruct"):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def __init__(self, model_name:str = "meta-llama/Llama-3.2-1B-Instruct") -> None:
+        # Inisialisasi variabel model lokal
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
         self.pipeline = None
+        
+        # Default config
+        self.temperature = 0.5
         self.ignore_hints = False
-        self.presses = []
-        self.chosen_press = None
+        self.use_self_correction = True
+        self.use_disambiguation = True
+        self.db_folder_path = ""
+        self.db_tbl_col_vals_file = ""
+        
+        # PENTING: Langsung load model saat inisialisasi
+        # Ini mencegah error 'NoneType' pada tokenizer nanti
         self.load_model()
 
-    def _infer_args(self, args: Optional[Dict[str, Any]] = None)-> None:
+    def load_model(self):
+        """
+        Memuat model Hugging Face ke GPU.
+        """
+        # Cek jika sudah loaded, skip saja agar hemat waktu
+        if self.model is not None and self.tokenizer is not None:
+            return
+
+        print(f"Loading local model: {self.model_name}...")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            
+            # Fix untuk model Llama yang kadang tidak punya pad_token
+            if self.tokenizer.pad_token_id is None:
+                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+            
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                device_map="auto",
+                torch_dtype=torch.float16, # Gunakan float16 agar hemat memori
+                trust_remote_code=True
+            )
+            
+            self.pipeline = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                torch_dtype=torch.float16,
+                device_map="auto"
+            )
+            print("Model loaded successfully.")
+        except Exception as e:
+            logging.error(f"Failed to load model: {e}")
+            # Jangan raise error fatal, set None agar bisa ditangani di chat()
+            self.model = None
+            self.tokenizer = None
+
+    def _infer_args(self, args: Optional[Dict[str, Any]] = None):
         parser = HfArgumentParser((ModelArguments, DataArguments,
                                    FinetuningArguments, GeneratingArguments))
         if args:
@@ -43,8 +97,7 @@ class OfflineModel(BaseModel):
                 finetuning_args,
                 self.generating_args,
             ) = parser.parse_args_into_dataclasses()
-            # Initial generation and error correction uses this.
-            # Set to 0.5 by default.
+            
             self.temperature = self.generating_args.temperature
             self.use_self_correction = self.generating_args.use_self_correction
             self.use_disambiguation = self.generating_args.use_disambiguation
@@ -53,182 +106,375 @@ class OfflineModel(BaseModel):
             self.db_folder_path = self.data_args.db_folder_path
             self.db_tbl_col_vals_file = self.data_args.db_tbl_col_vals_file
             self.ignore_hints = self.generating_args.ignore_hints
+        
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
-
-    def load_model(self):
-        print(f"loading the model: {self.model_name} on {self.device}...")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else None,
-            trust_remote_code=True
-        )
-        print("Applying KVPress compression...")
-        self.presses.append({"name":"knormPress", "press":KnormPress(compression_ratio = 0.4)})
-        self.presses.append({"name":"SnapKVPress", "press":SnapKVPress(compression_ratio = 0.4)})
-        self.presses.append({"name":"ExpectedAttentionPress", "press":ExpectedAttentionPress(compression_ratio = 0.4)})
-        self.chosen_press = self.presses[0]["press"]
-
-        self.model.eval()
-        self.pipeline = pipeline(
-            "text-generation",
-            model = self.model,
-            tokenizer=self.tokenizer,
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-            temperature = 0.1,
-            max_new_tokens = 512,
-            do_sample = False
-        )
-
-
-    def chat(self,
-        query: str,
-        history: Optional[List[Tuple[str, str]]] = None,
-        system: Optional[str] = None,
-        **input_kwargs) -> Tuple[str, Tuple[int, int]]:
         
+        # Pastikan model termuat (double check)
+        if self.model is None:
+            self.load_model()
+
+    def set_temperature(self, temperature):
+        self.temperature = temperature
+        
+    def _count_token(self, prompt):
+        # ADAPTASI: Menggunakan tokenizer lokal
         try:
-            # Construct prompt from components
-            # full_prompt = ""
-            # if system:
-            #     full_prompt += f"{system}\n"
-            # if history:
-            #     for past_query, past_response in history:
-            #         full_prompt += f"User: {past_query}\nAssistant: {past_response}\n"
-            messages = []
-
-            messages.append({"role": "system", "content": system})
-            if history:
-                for past_query, past_response in history:
-                    messages.append({"role": "user", "content": past_query})
-                    messages.append({"role": "assistant", "content": past_response})
-
-            # full_prompt += f"User: {query}\nAssistant: "
-            messages.append({"role": "user", "content": query})
-            full_prompt = self.tokenizer.apply_chat_template(messages, tokenize = False, add_generation_prompt = True)
-            # Get token count before generation
-            input_tokens = len(self.tokenizer.encode(full_prompt, add_special_tokens = False)[0])
-                
-            # Generate response using local pipeline
-            if self.chosen_press:
-                context = system + "\n" + "\n".join([past_query, past_response] for past_query, past_response in history)
-                print(f"context : {context}")
-                with self.chosen_press(self.model):
-                    outputs = self.pipeline(
-                        context = context,
-                        question = query,
-                        return_full_text=False,
-                        **input_kwargs
-                    )
-            else:
-                # Fallback if KVPress is not loaded
-                outputs = self.pipeline(
-                    full_prompt,
-                    return_full_text=False,
-                    **input_kwargs
+            if self.tokenizer:
+                return len(self.tokenizer.encode(prompt))
+            return 0
+        except Exception as e:
+            logging.debug(f"Token counting failed: {e}")
+            return 0
+        
+    def _compress(self, query, multiplier=1.4):
+        # LOGIKA SAMA DENGAN API_MODEL
+        pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        query = re.sub(pattern, "", query)
+        n_reduction = 0
+        # Batas karakter disesuaikan sedikit untuk konteks lokal
+        while len(query) > 2000000 * multiplier and n_reduction < 8:
+            processed_lines = []
+            for line in query.splitlines():
+                if len(line) > 20000:
+                    processed_lines.append(line[:-10000])
+                else:
+                    processed_lines.append(line)
+            query = "\n".join(processed_lines)
+            n_reduction += 1
+        return query
+    
+    def _remove_col_vals(self, query):
+        # LOGIKA SAMA DENGAN API_MODEL
+        before = len(query)
+        if "###Table column example values###" in query:
+            prefix = query.split(
+                "###Table column example values###")[0]
+            postfix = "**************************".join(
+                    query.split(
+                    "###Table column example values###")[1].split(
+                    "**************************")[1:]
                 )
-            generated_text = outputs[0]['generated_text']
-            print(f"text generation done: {generated_text}")
-            sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", generated_text, re.IGNORECASE)
-            if sql_match:
-                final_response = sql_match.group(1).strip()
-            elif "SELECT" in generated_text.upper():
-                # Fallback: simple strip if no code block is found
-                final_response = generated_text.strip()
-            else:
-                final_response = generated_text.strip()
-            # Count output tokens
-            output_tokens = len(self.tokenizer.encode(final_response))
-                
-            return generated_text, (input_tokens, output_tokens)
-        except Exception as e:
-            logging.error(f"Local generation error: {str(e)}")
-            return final_response, (input_tokens, output_tokens)
+            postfix = "**************************" + postfix
+        elif "###Examples###" in query:
+            prefix = query.split(
+                "###Examples###")[0]
+            postfix = "**************************".join(
+                    query.split(
+                    "###Examples###")[1].split(
+                    "**************************")[1:]
+                )
+            postfix = "**************************" + postfix
+        elif len(query) >= 10 * 1024 * 1024:
+            prefix = query[: 5 * 1024 * 1024]
+            postfix = query[: -5 * 1024 * 1024 + 1]
+        else:
+            prefix, postfix = query, ""
+        query = prefix + postfix
+        if len(query) == before:
+            logging.error(f"Failed to reduce query size from {before}!")
+        return query
+    
+    def _remove_hints(self, query):
+        # LOGIKA SAMA DENGAN API_MODEL
+        if query.find("(Hints:") > -1 and self.ignore_hints:
+            prefix = query.split(
+                "(Hints:")[0]
+            postfix = "**************************".join(
+                query.split("(Hints:")[1].split(
+                "**************************")[1:])
+            return prefix + "**************************" + postfix
+        return query
 
-    def stream_chat(self,
-                   query: str, 
-                   history: Optional[List[Tuple[str, str]]] = None,
-                   system: Optional[str] = None,
-                   **input_kwargs) -> Generator[str, None, None]:
-        """Stream responses using local model."""
-        try:
-            # Use existing pipeline with streaming
-            full_prompt = f"{system}\n" if system else ""
-            if history:
-                for q, a in history:
-                    full_prompt += f"User: {q}\nAssistant: {a}\n"
-            full_prompt += f"User: {query}\nAssistant:"
-
-            # Generate text in chunks
-            for output in self.pipeline(
-                full_prompt,
-                return_full_text=False,
-                max_new_tokens=4,  # Small chunks for streaming
-                **input_kwargs
-            ):
-                yield output[0]['generated_text']
-        except Exception as e:
-            logging.error(f"Local streaming error: {str(e)}")
-            yield ""
-
-    def verify_and_correct(self, 
-                          query: str,
-                          sql: str,
-                          db_folder_path: str,
-                          qid: int,
-                          return_invalid: bool = True,
-                          use_flash: bool = False) -> Tuple[str, int, int]:
-        """Verify SQL locally without API calls."""
-        verification_prompt = f"""
-        Verify this SQL query:
-        Question: {query}
-        SQL: {sql}
-        Check for syntax errors and semantic correctness.
-        Provide corrected SQL if needed.
+    def _generate_sql(self,
+                      query,
+                      temperature=0.5,
+                      use_flash=False,
+                      max_retries=5):
+        """
+        Fungsi inti generasi teks.
+        Menggantikan panggilan Google Gemini dengan Hugging Face Pipeline.
         """
         
-        response, (input_tokens, output_tokens) = self.chat(verification_prompt)
+        # 1. Kompresi & Preprocessing
+        query = self._compress(query)
+        query = self._remove_hints(query)
         
-        sql_match = re.search(r"```(?:sql)?\s*([\s\S]+?)\s*```", response, re.IGNORECASE)
-        if sql_match:
-            # Extract the captured group (the content inside the fences)
-            corrected_sql = sql_match.group(1).strip()
-            
-        elif "SELECT" in response.upper():
-            # Fallback: If no code block, return the stripped response 
-            # (assuming the LLM outputted only the SQL, which is a weak assumption)
-            corrected_sql = response.strip()
-            
-        else:
-            # Default to the original SQL if correction failed or model provided no new query
-            corrected_sql = sql
-            
-        return corrected_sql, input_tokens, output_tokens
+        # Cek keamanan model sebelum generate
+        if self.pipeline is None:
+            logging.error("Pipeline is None. Attempting to reload model.")
+            self.load_model()
+            if self.pipeline is None:
+                return "", 0
 
-    def majority_voting(self, query: str, candidates: List[str]) -> str:
-        """Local implementation of majority voting."""
-        if not candidates:
-            return ""
-        
-        # Simple voting prompt
-        voting_prompt = (
-            f"Question: {query}\n"
-            "Choose the most correct SQL query:\n"
-            + "\n".join(f"{i+1}. {c}" for i, c in enumerate(candidates))
-            + "\nReturn the number of the best query."
-        )
-        
-        response, _ = self.chat(voting_prompt)
-        
-        # Try to extract a number from response
         try:
-            chosen = int(''.join(filter(str.isdigit, response.strip()))) - 1
-            if 0 <= chosen < len(candidates):
-                return candidates[chosen]
-        except (ValueError, IndexError):
-            pass
+            # 2. Panggil Model Lokal
+            outputs = self.pipeline(
+                query,
+                max_new_tokens=512, # Batas output SQL
+                do_sample=True if temperature > 0 else False,
+                temperature=temperature if temperature > 0 else 1.0,
+                top_p=0.9,
+                return_full_text=False,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
             
-        return candidates[0]  # Default to first candidate
+            resp = outputs[0]['generated_text']
+            
+            # 3. Cleaning Response (Sama seperti Gemini)
+            resp = resp.replace("```sql","").replace("```", "\n")
+            if "<FINAL_ANSWER>" in resp:
+                resp = resp.split("<FINAL_ANSWER>")[1].split("</FINAL_ANSWER>")[0]
+                
+        except torch.cuda.OutOfMemoryError:
+            # Penanganan Error Memori (OOM)
+            logging.error("GPU Out of Memory in _generate_sql")
+            torch.cuda.empty_cache()
+            
+            if max_retries > 0:
+                logging.info("Retrying with reduced context (removing col vals)...")
+                query = self._remove_col_vals(query)
+                return self._generate_sql(query, temperature, use_flash, max_retries - 1)
+            
+            return "", 0 
+            
+        except Exception as e:
+            logging.error(f"Local generation failed: {e}")
+            return "", 0
+
+        # 4. Post-processing Regex (Sama seperti Gemini)
+        resp = re.sub(r"^ite\s+", "", resp)
+        resp = re.sub('\s+', ' ', resp).strip()
+        
+        # Ambil bagian SELECT saja
+        sql_match = re.search(r"SELECT.*", resp, re.IGNORECASE | re.DOTALL)
+        if sql_match:
+            resp = sql_match.group(0)
+
+        return resp, max_retries
+
+    def majority_voting(self, query, candidates):
+        # LOGIKA SAMA DENGAN API_MODEL
+        should_vote = False
+        for c in candidates:
+            if c != candidates[0]:
+                should_vote = True
+                break
+        if not should_vote:
+            return candidates[0]
+        candidates = "\n\n".join([c for c in set(candidates)])
+        sql, _ = self._generate_sql(MAJORITY_VOTING.format(input=query,
+                                                        candidates=candidates),
+                                 use_flash=False)
+        return sql
+    
+    def verify_answer(self, sql, question, schema, use_flash=False):
+        # LOGIKA SAMA DENGAN API_MODEL
+        prompt = VERIFY_ANSWER.format(sql=sql, question=question, schema=schema)
+        answer, _ = self._generate_sql(prompt, use_flash=use_flash)
+        return answer
+
+    def verify_and_correct(self, query, sql, db_folder_path, qid, return_invalid=True, use_flash=False):
+        """
+        Fitur Self-Correction yang menjalankan SQL di database SQLite lokal.
+        """
+        
+        if not self.use_self_correction or query == "":
+            return sql, 0
+
+        # --- Helper Functions (Sama seperti api_model.py) ---
+        def fix_error(s, err):
+            try:
+                context_str = query[query.find("###Table creation statements###"
+                                            ):query.find("###Question###")]
+                input_str = query[query.find("###Question###"):query.find(
+                    "Now generate SQLite SQL query to answer the given")]
+            except:
+                context_str = ""
+                input_str = query
+                
+            new_prompt = CHECKER_TEMPLATE.format(context_str, input_str, s,
+                                                 err)
+            new_sql, _ = self._generate_sql(new_prompt,
+                                         use_flash=use_flash,
+                                         temperature=self.temperature)
+            return new_sql, self._count_token(new_prompt) if self.measure_self_correction_tokens else 0
+
+        def fix_literal_error(s, db_id, tried_sql):
+            if s == "":
+                return fix_error(s, "INFO:root:")
+            
+            tbl_col_vals = dict()
+            if os.path.exists(self.db_tbl_col_vals_file):
+                with open(self.db_tbl_col_vals_file, 'rb') as file:
+                    try:
+                        data = pickle.load(file)
+                        tbl_col_vals = data.get(db_id, dict())
+                    except:
+                        pass
+
+            def validate_email(email):
+                pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+                return re.match(pattern, str(email)) is not None
+            
+            def extract_table_info(input_string):
+                table_info = {}
+                tables = re.findall(r"CREATE TABLE (\w+)\s*\((.*?)\);", input_string, re.DOTALL)
+                for table_name, table_body in tables:
+                    columns = re.findall(r"(\w+)\s+\w+.*?-- examples:\s*(.*?)\s*\|", table_body, re.DOTALL)
+                    for column_name, example_values in columns:
+                        values = re.findall(r"`(.*?)`", example_values)
+                        table_info[f"{table_name}.{column_name}"] = values
+                return table_info
+            
+            def format_col_vals(tbl_col_vals):
+                s = ""
+                for tbl, col_vals in tbl_col_vals.items():
+                    for col, vals in col_vals.items():
+                        if len(vals) > 0 and validate_email(vals[0]):
+                            continue
+                        s += f'* `{tbl}`.`{col}`: [{",".join(str(v) for v in vals[:])}]\n'
+                return s
+            
+            if self.use_column_filtering_for_correction:
+                try:
+                    df = pd.read_csv(self.data_args.filtered_schema_file)
+                    id_name, schema_name = 'question_id', 'selected_schema_with_connections'
+                    col_selected_schemas = dict()
+                    for k, v in zip(df[id_name], df[schema_name]):
+                        col_selected_schemas[int(k)] = v
+                    filtered_schema = col_selected_schemas.get(qid, "")
+                    if filtered_schema:
+                        table_info = extract_table_info(filtered_schema)
+                        col_vals = ""
+                        for key, value in table_info.items():
+                            col_vals += f"{key}: {value}\n"
+                    else:
+                        col_vals = format_col_vals(tbl_col_vals)
+                except:
+                    col_vals = format_col_vals(tbl_col_vals)
+            else:
+                col_vals = format_col_vals(tbl_col_vals)
+            
+            try:
+                context_str = query[query.find("###Table creation statements###"
+                                            ):query.find("###Question###")]
+                input_str = query[query.find("###Question###"):query.find(
+                    "Now generate SQLite SQL query to answer the given")]
+            except:
+                context_str = ""
+                input_str = query
+
+            new_prompt = LITERAL_ERROR_TEMPLATE.format(context_str, col_vals,
+                                                       input_str,
+                                                       "\n".join(tried_sql))
+            new_sql, _ = self._generate_sql(new_prompt,
+                                         use_flash=use_flash,
+                                         temperature=0.9)
+            return new_sql, self._count_token(new_prompt) if self.measure_self_correction_tokens else 0
+
+        def isValidSQL(sql, db_path):
+            # EKSEKUSI SQL DI DATABASE LOKAL
+            if not os.path.exists(db_path):
+                # Jika path DB tidak ketemu, anggap valid saja agar tidak stuck
+                logging.warning(f"DB not found at {db_path}, skipping execution check.")
+                return True, "", 0
+                
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            err = ""
+            rows = []
+            is_valid = True
+            try:
+                rows = cursor.execute(sql).fetchall()
+                if len(rows) == 0:
+                    is_valid = False
+                    err = "empty results"
+            except sqlite3.Warning as warning:
+                logging.debug(f"SQLite Warning: {warning}")
+                err = str(warning)
+                is_valid = False
+            except Exception as e:
+                logging.debug(e)
+                err = str(e)
+                is_valid = False
+            finally:
+                if conn:
+                    conn.close()
+            return is_valid, err, len(rows)
+
+        # --- Main Correction Logic ---
+        try:
+            # Mencari path database
+            db_name = query.split("The database (\"")[1].split("\") structure")[0]
+            db_path = os.path.join(db_folder_path, db_name, f"{db_name}.sqlite")
+        except:
+            logging.warning("Could not parse DB name, skipping execution check.")
+            return sql, 0
+
+        accumulated_token_count = 0
+
+        _sql = sql
+        retry_cnt, max_retries = 0, 5
+        
+        # Cek apakah SQL valid
+        valid, err, row_cnt = isValidSQL(_sql, db_path)
+        tried_sql = [_sql]
+        
+        # Loop perbaikan jika error
+        while not valid and retry_cnt < max_retries:
+            print(f"  [Correction] Try {retry_cnt+1}: Error='{err}'")
+            if err == "empty results" and self.use_disambiguation:
+                _sql, extra_tokens = fix_literal_error(_sql, db_name, tried_sql)
+            else:
+                _sql, extra_tokens = fix_error(_sql, err)
+            accumulated_token_count += extra_tokens
+            tried_sql.append(_sql)
+            valid, err, row_cnt = isValidSQL(_sql, db_path)
+            retry_cnt += 1
+            
+        if retry_cnt >= max_retries:
+            logging.info(f"Correction failed due to {err}: {_sql}")
+            if not return_invalid:
+                return "", accumulated_token_count
+        return _sql, accumulated_token_count
+
+    def chat(self,
+             query: str,
+             history: Optional[List[Tuple[str, str]]] = None,
+             system: Optional[str] = None,
+             **input_kwargs) -> Tuple[str, Tuple[int, int]]:
+        
+        # Wrapper untuk _generate_sql agar sesuai format chat
+        # PENTING: Selalu return tuple (str, tuple) agar tidak error unpack
+        resp = ""
+        in_tok = 0
+        out_tok = 0
+        
+        try:
+            use_flash = False
+            if 'use_flash' in input_kwargs and input_kwargs['use_flash']:
+                use_flash = True
+            
+            resp, _ = self._generate_sql(query,
+                                      use_flash=use_flash,
+                                      temperature=self.temperature)
+            
+            # Hitung token untuk laporan
+            in_tok = self._count_token(query)
+            out_tok = self._count_token(resp)
+            
+        except Exception as e:
+            print(f'\n*** Error in chat: {e}\n')
+            # Tetap return format yang benar meskipun kosong
+            return "", (0, 0)
+            
+        return resp, (in_tok, out_tok)
+
+    def stream_chat(self,
+                    query: str,
+                    history: Optional[List[Tuple[str, str]]] = None,
+                    system: Optional[str] = None,
+                    **input_kwargs) -> Generator[str, None, None]:
+        raise NotImplementedError("Streaming not implemented for OfflineModel.")
