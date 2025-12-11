@@ -56,6 +56,12 @@ bitsandbytes = "0.41.3.post2"
 openai = "^1.6.1"
 kvpress = "^0.1.0"
 
+[tool.poetry.group.gpu]
+optional = true
+
+[tool.poetry.group.gpu.dependencies]
+flash-attn = "^2.6.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
