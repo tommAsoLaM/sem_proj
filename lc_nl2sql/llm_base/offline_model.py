@@ -49,7 +49,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         self.use_kvpress = False
         # You can change default self_attn_func here
-        self.kvpress_policy = SnapKV(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = SnapKVPress(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
