@@ -15,17 +15,34 @@ from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
 
-# Konfigurasi Logging
+# [NEW] Import KVPress and desired Policy
+# Ensure kvpress library is installed or in path
+try:
+    from kvpress import KVPress
+    # Example default policy (e.g. SnapKV), change as needed
+    from kvpress import SnapKV 
+    KVPRESS_AVAILABLE = True
+except ImportError:
+    KVPRESS_AVAILABLE = False
+    logging.warning("KVPress library not found. KVPress features will be disabled.")
+
+# Logging Configuration
 logging.basicConfig(level=logging.INFO)
 
 class OfflineModel(BaseModel):
 
     def __init__(self, model_name:str = "meta-llama/Llama-3.2-1B-Instruct") -> None:
-        # Inisialisasi variabel model lokal
+        # Initialize local model variables
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
         self.pipeline = None
+        
+        # [NEW] Variables for KVPress
+        self.kvpress_instance = None
+        self.use_kvpress = False
+        # You can change default self_attn_func here
+        self.kvpress_policy = SnapKV(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -35,15 +52,15 @@ class OfflineModel(BaseModel):
         self.db_folder_path = ""
         self.db_tbl_col_vals_file = ""
         
-        # PENTING: Langsung load model saat inisialisasi
-        # Ini mencegah error 'NoneType' pada tokenizer nanti
+        # IMPORTANT: Load model immediately during initialization
+        # This prevents 'NoneType' error on tokenizer later
         self.load_model()
 
     def load_model(self):
         """
-        Memuat model Hugging Face ke GPU.
+        Loads Hugging Face model to GPU.
         """
-        # Cek jika sudah loaded, skip saja agar hemat waktu
+        # Check if already loaded, skip to save time
         if self.model is not None and self.tokenizer is not None:
             return
 
@@ -51,16 +68,21 @@ class OfflineModel(BaseModel):
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
-            # Fix untuk model Llama yang kadang tidak punya pad_token
+            # Fix for Llama models that sometimes don't have pad_token
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
             
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
                 device_map="auto",
-                torch_dtype=torch.float16, # Gunakan float16 agar hemat memori
+                torch_dtype=torch.float16, # Use float16 to save memory
                 trust_remote_code=True
             )
+            
+            # [NEW] Initialize KVPress Wrapper on Model
+            if KVPRESS_AVAILABLE:
+                print("Initializing KVPress wrapper...")
+                self.kvpress_instance = KVPress(self.model)
             
             self.pipeline = pipeline(
                 "text-generation",
@@ -72,7 +94,7 @@ class OfflineModel(BaseModel):
             print("Model loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to load model: {e}")
-            # Jangan raise error fatal, set None agar bisa ditangani di chat()
+            # Do not raise fatal error, set None to be handled in chat()
             self.model = None
             self.tokenizer = None
 
@@ -90,6 +112,9 @@ class OfflineModel(BaseModel):
             self.temperature = args.get("temperature", 0.5)
             self.db_tbl_col_vals_file = args.get("db_tbl_col_vals_file", "db_tbl_col_vals_bird.pickle")
             self.ignore_hints = args.get("ignore_hints", False)
+            
+            # [NEW] Get KVPress arguments from input args if present
+            self.use_kvpress = args.get("use_kvpress", False)
         else:
             (
                 model_args,
@@ -106,19 +131,27 @@ class OfflineModel(BaseModel):
             self.db_folder_path = self.data_args.db_folder_path
             self.db_tbl_col_vals_file = self.data_args.db_tbl_col_vals_file
             self.ignore_hints = self.generating_args.ignore_hints
+            
+            # [NEW] Default False if not in arguments
+            self.use_kvpress = getattr(self.generating_args, "use_kvpress", False)
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
         
-        # Pastikan model termuat (double check)
+        # Ensure model is loaded (double check)
         if self.model is None:
             self.load_model()
+
+    # [NEW] Helper to dynamically change KVPress policy
+    def set_kvpress_policy(self, policy):
+        """Sets self_attn_func (policy) for KVPress"""
+        self.kvpress_policy = policy
 
     def set_temperature(self, temperature):
         self.temperature = temperature
         
     def _count_token(self, prompt):
-        # ADAPTASI: Menggunakan tokenizer lokal
+        # ADAPTATION: Using local tokenizer
         try:
             if self.tokenizer:
                 return len(self.tokenizer.encode(prompt))
@@ -128,11 +161,11 @@ class OfflineModel(BaseModel):
             return 0
         
     def _compress(self, query, multiplier=1.4):
-        # LOGIKA SAMA DENGAN API_MODEL
+        # LOGIC SAME AS API_MODEL
         pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
         query = re.sub(pattern, "", query)
         n_reduction = 0
-        # Batas karakter disesuaikan sedikit untuk konteks lokal
+        # Character limit adjusted slightly for local context
         while len(query) > 2000000 * multiplier and n_reduction < 8:
             processed_lines = []
             for line in query.splitlines():
@@ -145,7 +178,7 @@ class OfflineModel(BaseModel):
         return query
     
     def _remove_col_vals(self, query):
-        # LOGIKA SAMA DENGAN API_MODEL
+        # LOGIC SAME AS API_MODEL
         before = len(query)
         if "###Table column example values###" in query:
             prefix = query.split(
@@ -176,7 +209,7 @@ class OfflineModel(BaseModel):
         return query
     
     def _remove_hints(self, query):
-        # LOGIKA SAMA DENGAN API_MODEL
+        # LOGIC SAME AS API_MODEL
         if query.find("(Hints:") > -1 and self.ignore_hints:
             prefix = query.split(
                 "(Hints:")[0]
@@ -192,15 +225,15 @@ class OfflineModel(BaseModel):
                       use_flash=False,
                       max_retries=5):
         """
-        Fungsi inti generasi teks.
-        Menggantikan panggilan Google Gemini dengan Hugging Face Pipeline.
+        Core text generation function.
+        Replaces Google Gemini calls with Hugging Face Pipeline.
         """
         
-        # 1. Kompresi & Preprocessing
+        # 1. Compression & Preprocessing
         query = self._compress(query)
         query = self._remove_hints(query)
         
-        # Cek keamanan model sebelum generate
+        # Check model safety before generation
         if self.pipeline is None:
             logging.error("Pipeline is None. Attempting to reload model.")
             self.load_model()
@@ -208,26 +241,42 @@ class OfflineModel(BaseModel):
                 return "", 0
 
         try:
-            # 2. Panggil Model Lokal
-            outputs = self.pipeline(
-                query,
-                max_new_tokens=512, # Batas output SQL
-                do_sample=True if temperature > 0 else False,
-                temperature=temperature if temperature > 0 else 1.0,
-                top_p=0.9,
-                return_full_text=False,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
+            # 2. Call Local Model
+            # [NEW] KVPress Integration
+            # If KVPress is active, wrap pipeline with policy context manager
+            if self.use_kvpress and self.kvpress_instance and self.kvpress_policy:
+                logging.info(f"Generating with KVPress policy: {type(self.kvpress_policy).__name__}")
+                with self.kvpress_instance(self.kvpress_policy):
+                    outputs = self.pipeline(
+                        query,
+                        max_new_tokens=512,
+                        do_sample=True if temperature > 0 else False,
+                        temperature=temperature if temperature > 0 else 1.0,
+                        top_p=0.9,
+                        return_full_text=False,
+                        pad_token_id=self.tokenizer.eos_token_id
+                    )
+            else:
+                # Standard generation without KVPress
+                outputs = self.pipeline(
+                    query,
+                    max_new_tokens=512, # SQL output limit
+                    do_sample=True if temperature > 0 else False,
+                    temperature=temperature if temperature > 0 else 1.0,
+                    top_p=0.9,
+                    return_full_text=False,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
             
             resp = outputs[0]['generated_text']
             
-            # 3. Cleaning Response (Sama seperti Gemini)
+            # 3. Cleaning Response (Same as Gemini)
             resp = resp.replace("```sql","").replace("```", "\n")
             if "<FINAL_ANSWER>" in resp:
                 resp = resp.split("<FINAL_ANSWER>")[1].split("</FINAL_ANSWER>")[0]
                 
         except torch.cuda.OutOfMemoryError:
-            # Penanganan Error Memori (OOM)
+            # Memory Error Handling (OOM)
             logging.error("GPU Out of Memory in _generate_sql")
             torch.cuda.empty_cache()
             
@@ -242,11 +291,11 @@ class OfflineModel(BaseModel):
             logging.error(f"Local generation failed: {e}")
             return "", 0
 
-        # 4. Post-processing Regex (Sama seperti Gemini)
+        # 4. Post-processing Regex (Same as Gemini)
         resp = re.sub(r"^ite\s+", "", resp)
         resp = re.sub('\s+', ' ', resp).strip()
         
-        # Ambil bagian SELECT saja
+        # Take only the SELECT part
         sql_match = re.search(r"SELECT.*", resp, re.IGNORECASE | re.DOTALL)
         if sql_match:
             resp = sql_match.group(0)
@@ -254,7 +303,7 @@ class OfflineModel(BaseModel):
         return resp, max_retries
 
     def majority_voting(self, query, candidates):
-        # LOGIKA SAMA DENGAN API_MODEL
+        # LOGIC SAME AS API_MODEL
         should_vote = False
         for c in candidates:
             if c != candidates[0]:
@@ -269,20 +318,20 @@ class OfflineModel(BaseModel):
         return sql
     
     def verify_answer(self, sql, question, schema, use_flash=False):
-        # LOGIKA SAMA DENGAN API_MODEL
+        # LOGIC SAME AS API_MODEL
         prompt = VERIFY_ANSWER.format(sql=sql, question=question, schema=schema)
         answer, _ = self._generate_sql(prompt, use_flash=use_flash)
         return answer
 
     def verify_and_correct(self, query, sql, db_folder_path, qid, return_invalid=True, use_flash=False):
         """
-        Fitur Self-Correction yang menjalankan SQL di database SQLite lokal.
+        Self-Correction feature that executes SQL on local SQLite database.
         """
         
         if not self.use_self_correction or query == "":
             return sql, 0
 
-        # --- Helper Functions (Sama seperti api_model.py) ---
+        # --- Helper Functions (Same as api_model.py) ---
         def fix_error(s, err):
             try:
                 context_str = query[query.find("###Table creation statements###"
@@ -374,9 +423,9 @@ class OfflineModel(BaseModel):
             return new_sql, self._count_token(new_prompt) if self.measure_self_correction_tokens else 0
 
         def isValidSQL(sql, db_path):
-            # EKSEKUSI SQL DI DATABASE LOKAL
+            # EXECUTE SQL IN LOCAL DATABASE
             if not os.path.exists(db_path):
-                # Jika path DB tidak ketemu, anggap valid saja agar tidak stuck
+                # If DB path not found, assume valid to avoid getting stuck
                 logging.warning(f"DB not found at {db_path}, skipping execution check.")
                 return True, "", 0
                 
@@ -406,7 +455,7 @@ class OfflineModel(BaseModel):
 
         # --- Main Correction Logic ---
         try:
-            # Mencari path database
+            # Finding database path
             db_name = query.split("The database (\"")[1].split("\") structure")[0]
             db_path = os.path.join(db_folder_path, db_name, f"{db_name}.sqlite")
         except:
@@ -418,11 +467,11 @@ class OfflineModel(BaseModel):
         _sql = sql
         retry_cnt, max_retries = 0, 5
         
-        # Cek apakah SQL valid
+        # Check if SQL is valid
         valid, err, row_cnt = isValidSQL(_sql, db_path)
         tried_sql = [_sql]
         
-        # Loop perbaikan jika error
+        # Correction loop if error
         while not valid and retry_cnt < max_retries:
             print(f"  [Correction] Try {retry_cnt+1}: Error='{err}'")
             if err == "empty results" and self.use_disambiguation:
@@ -446,8 +495,8 @@ class OfflineModel(BaseModel):
              system: Optional[str] = None,
              **input_kwargs) -> Tuple[str, Tuple[int, int]]:
         
-        # Wrapper untuk _generate_sql agar sesuai format chat
-        # PENTING: Selalu return tuple (str, tuple) agar tidak error unpack
+        # Wrapper for _generate_sql to match chat format
+        # IMPORTANT: Always return tuple (str, tuple) to avoid unpack error
         resp = ""
         in_tok = 0
         out_tok = 0
@@ -461,13 +510,13 @@ class OfflineModel(BaseModel):
                                       use_flash=use_flash,
                                       temperature=self.temperature)
             
-            # Hitung token untuk laporan
+            # Calculate tokens for report
             in_tok = self._count_token(query)
             out_tok = self._count_token(resp)
             
         except Exception as e:
             print(f'\n*** Error in chat: {e}\n')
-            # Tetap return format yang benar meskipun kosong
+            # Still return correct format even if empty
             return "", (0, 0)
             
         return resp, (in_tok, out_tok)
