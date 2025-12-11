@@ -26,9 +26,8 @@ except ImportError:
 # [NEW] Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
-    from kvpress import KVPress
     # Example default policy (e.g. SnapKV), change as needed
-    from kvpress import SnapKV 
+    from kvpress import SnapKVPress 
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
