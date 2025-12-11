@@ -15,6 +15,14 @@ from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
 
+# [NEW] Check for Flash Attention
+try:
+    import flash_attn
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+    logging.warning("Flash Attention not found. Install with 'pip install flash-attn --no-build-isolation'.")
+
 # [NEW] Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
@@ -72,11 +80,15 @@ class OfflineModel(BaseModel):
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
             
+            # [NEW] Determine attention implementation
+            attn_impl = "flash_attention_2" if FLASH_ATTN_AVAILABLE else None
+
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
                 device_map="auto",
                 torch_dtype=torch.float16, # Use float16 to save memory
-                trust_remote_code=True
+                trust_remote_code=True,
+                attn_implementation=attn_impl # Add this argument
             )
             
             # [NEW] Initialize KVPress Wrapper on Model
