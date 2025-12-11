@@ -106,7 +106,7 @@ class OfflineModel(BaseModel):
                     messages.append({"role": "user", "content": past_query})
                     messages.append({"role": "assistant", "content": past_response})
 
-            # full_prompt += f"User: {query}\nAssistant:"
+            # full_prompt += f"User: {query}\nAssistant: "
             messages.append({"role": "user", "content": query})
             full_prompt = self.tokenizer.apply_chat_template(messages, tokenize = False, add_generation_prompt = True)
             # Get token count before generation
