@@ -242,8 +242,8 @@ class GeneratingArguments:
 
 @dataclass
 class FinetuningArguments:
-    r"""
-    Arguments pertaining to which techniques we are going to fine-tuning with.
+    """
+    Arguments pertaining to which techniques we are going to use for training.
     """
     stage: Optional[Literal["sft", "rm"]] = field(
         default="sft", metadata={"help": "Which stage will be performed in training."}
@@ -320,6 +320,10 @@ class FinetuningArguments:
     )
     dpo_beta: Optional[float] = field(
         default=0.1, metadata={"help": "The beta parameter for the DPO loss."}
+    )
+    finetuning_type: str = field(
+        default="lora",
+        metadata={"help": "The name of the finetuning technique."}
     )
 
     def __post_init__(self):
