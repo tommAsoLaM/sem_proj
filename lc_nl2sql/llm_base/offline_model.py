@@ -79,7 +79,7 @@ class OfflineModel(BaseModel):
             self.presses.append({"name":"Expected","press": ExpectedAttentionPress(compression_ratio = 0.4)})
             self.presses.append({"name":"Finch", "press": FinchPress(compression_ratio = 0.4)})
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.press = self.presses[0]["press"]
+            self.kvpress_instance = self.presses[0]["press"]
             
             # Fix for Llama models that sometimes don't have pad_token
             if self.tokenizer.pad_token_id is None:
