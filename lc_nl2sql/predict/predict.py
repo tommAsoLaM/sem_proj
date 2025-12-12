@@ -90,9 +90,13 @@ def inference_worker(
 
 def parallelized_inference(model: BaseModel, predict_data: List[Dict],
                            **input_kwargs):
-    num_threads = 50
-    if model.generating_args.num_beams > 10:
-        num_threads = 10
+
+    # change from 50 to 1, because for local model, high number of threads will cause overload
+    num_threads = 1 
+    
+    # deactivate the old code for num_beams limitation
+    # if model.generating_args.num_beams > 10:
+    #     num_threads = 10
 
     res_dict = {}
     extra_tokens, n_tries, latency, verify_latency = [], [], [], []
