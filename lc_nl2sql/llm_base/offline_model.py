@@ -93,6 +93,7 @@ class OfflineModel(BaseModel):
             # [NEW] Initialize KVPress Wrapper on Model
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper...")
+                # Pastikan ini membuat instance dari Press yang diinginkan
                 self.kvpress_instance = ExpectedAttentionPress(compression_ratio=0.4)
             
             self.pipeline = pipeline(
@@ -255,9 +256,12 @@ class OfflineModel(BaseModel):
             # 2. Call Local Model
             # [NEW] KVPress Integration
             # If KVPress is active, wrap pipeline with policy context manager
-            if self.use_kvpress and self.kvpress_instance and self.kvpress_policy:
-                logging.info(f"Generating with KVPress policy: {type(self.kvpress_policy).__name__}")
-                with self.kvpress_instance(self.kvpress_policy):
+            if self.use_kvpress and self.kvpress_instance: # Hapus check self.kvpress_policy yang tidak perlu
+                logging.info(f"Generating with KVPress instance")
+                
+                # [PERBAIKAN UTAMA]
+                # Masukkan self.model ke dalam kurung, BUKAN self.kvpress_policy
+                with self.kvpress_instance(self.model): 
                     outputs = self.pipeline(
                         query,
                         max_new_tokens=512,

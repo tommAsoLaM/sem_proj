@@ -12,3 +12,4 @@ db_table_schema_map_ncv3_bird.cache
 db_tbl_col_vals_bird.pickle
 db_tbl_col_vals_bird.pickle
 db_tbl_col_vals_bird.pickle
+.DS_Store
