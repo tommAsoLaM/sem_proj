@@ -242,9 +242,26 @@ class OfflineModel(BaseModel):
         """
         
         # 1. Compression & Preprocessing
+        # Biarkan ini tetap berjalan pada string mentah
         query = self._compress(query)
         query = self._remove_hints(query)
         
+        # [BARU] Terapkan Chat Template Llama-3 di sini
+        # Kita bungkus query yang sudah bersih ke dalam format pesan User
+        try:
+            messages = [{"role": "user", "content": query}]
+            
+            # tokenize=False agar outputnya tetap string (tapi sudah ada tag <|user|> dll)
+            # add_generation_prompt=True agar model tahu giliran dia menjawab (<|assistant|>)
+            final_prompt = self.tokenizer.apply_chat_template(
+                messages, 
+                tokenize=False, 
+                add_generation_prompt=True
+            )
+        except Exception as e:
+            logging.warning(f"Failed to apply chat template: {e}. Using raw query.")
+            final_prompt = query
+
         # Check model safety before generation
         if self.pipeline is None:
             logging.error("Pipeline is None. Attempting to reload model.")
@@ -254,28 +271,32 @@ class OfflineModel(BaseModel):
 
         try:
             # 2. Call Local Model
-            # [NEW] KVPress Integration
-            # If KVPress is active, wrap pipeline with policy context manager
-            if self.use_kvpress and self.kvpress_instance: # Hapus check self.kvpress_policy yang tidak perlu
-                logging.info(f"Generating with KVPress instance")
-                
-                # [PERBAIKAN UTAMA]
-                # Masukkan self.model ke dalam kurung, BUKAN self.kvpress_policy
-                with self.kvpress_instance(self.model): 
-                    outputs = self.pipeline(
-                        query,
-                        max_new_tokens=512,
-                        do_sample=True if temperature > 0 else False,
-                        temperature=temperature if temperature > 0 else 1.0,
-                        top_p=0.9,
-                        return_full_text=False,
-                        pad_token_id=self.tokenizer.eos_token_id
-                    )
-            else:
-                # Standard generation without KVPress
+            outputs = None
+            
+            # [PERBAIKAN] Mekanisme Fallback untuk KVPress
+            if self.use_kvpress and self.kvpress_instance:
+                try:
+                    logging.info(f"Generating with KVPress instance")
+                    # Gunakan final_prompt di sini
+                    with self.kvpress_instance(self.model): 
+                        outputs = self.pipeline(
+                            final_prompt,  # <--- change 'query' into 'final_prompt'
+                            max_new_tokens=512,
+                            do_sample=True if temperature > 0 else False,
+                            temperature=temperature if temperature > 0 else 1.0,
+                            top_p=0.9,
+                            return_full_text=False,
+                            pad_token_id=self.tokenizer.eos_token_id
+                        )
+                except Exception as e:
+                    logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
+                    outputs = None
+
+            # Jika outputs masih None, jalankan mode normal
+            if outputs is None:
                 outputs = self.pipeline(
-                    query,
-                    max_new_tokens=512, # SQL output limit
+                    final_prompt, # <--- GANTI 'query' JADI 'final_prompt'
+                    max_new_tokens=512, 
                     do_sample=True if temperature > 0 else False,
                     temperature=temperature if temperature > 0 else 1.0,
                     top_p=0.9,
