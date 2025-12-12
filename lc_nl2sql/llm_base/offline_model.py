@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     
-    from kvpress import KVPress, KNormPress, SnapKVPress, ExpectedAttentionPress, FinchPress
+    from kvpress import KNormPress, SnapKVPress, ExpectedAttentionPress, FinchPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -50,6 +50,7 @@ class OfflineModel(BaseModel):
         self.use_kvpress = True
         self.presses=[]
         # You can change default self_attn_func here
+        self.kvpress_policy = KNormPress(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -73,15 +74,11 @@ class OfflineModel(BaseModel):
 
         print(f"Loading local model: {self.model_name}...")
         try:
-            if KVPRESS_AVAILABLE:
-                self.presses.append({"name":"knorm", "press": KNormPress(compression_ratio = 0.4)})
-                self.presses.append({"name":"Snap", "press": SnapKVPress(compression_ratio = 0.4)})
-                self.presses.append({"name":"Expected","press": ExpectedAttentionPress(compression_ratio = 0.4)})
-                self.presses.append({"name":"Finch", "press": FinchPress(compression_ratio = 0.4)})
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-                self.kvpress_policy = self.presses[0]["press"]
-            else:
-                self.kvpress_policy = None
+            self.presses.append({"name":"knorm", "press": KNormPress(compression_ratio = 0.4)})
+            self.presses.append({"name":"Snap", "press": SnapKVPress(compression_ratio = 0.4)})
+            self.presses.append({"name":"Expected","press": ExpectedAttentionPress(compression_ratio = 0.4)})
+            self.presses.append({"name":"Finch", "press": FinchPress(compression_ratio = 0.4)})
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
             # Fix for Llama models that sometimes don't have pad_token
             if self.tokenizer.pad_token_id is None:
