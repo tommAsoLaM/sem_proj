@@ -1,3 +1,14 @@
 __pycache__/
 .ipynb_checkpoints/
 lc_nl2sql/data/
+db_context_ncv10_bird.cache
+db_context_ncv1_bird.cache
+db_context_ncv2_bird.cache
+db_context_ncv3_bird.cache
+db_table_schema_map_ncv10_bird.cache
+db_table_schema_map_ncv1_bird.cache
+db_table_schema_map_ncv2_bird.cache
+db_table_schema_map_ncv3_bird.cache
+db_tbl_col_vals_bird.pickle
+db_tbl_col_vals_bird.pickle
+db_tbl_col_vals_bird.pickle

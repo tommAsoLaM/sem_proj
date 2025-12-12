@@ -1312,6 +1312,21 @@ six = "*"
 termcolor = "*"
 
 [[package]]
+name = "flash-attn"
+version = "2.8.3"
+description = "Flash Attention: Fast and Memory-Efficient Exact Attention"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "flash_attn-2.8.3.tar.gz", hash = "sha256:1e71dd64a9e0280e0447b8a0c2541bad4bf6ac65bdeaa2f90e51a9e57de0370d"},
+]
+
+[package.dependencies]
+einops = "*"
+torch = "*"
+
+[[package]]
 name = "fonttools"
 version = "4.61.0"
 description = "Tools to manipulate font files"
@@ -7409,4 +7424,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "f1089a3b92426c93c09dab4b613c4cbedf738066b34c978e09b7f1a3b1fd9cff"
+content-hash = "159a8682330a9003703df24ca9b323ceb754760ee28f71c82a56095093c8711e"

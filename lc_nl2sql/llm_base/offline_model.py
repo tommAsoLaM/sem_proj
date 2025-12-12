@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     
-    from kvpress import KNormPress, SnapKVPress, ExpectedAttentionPress, FinchPress
+    from kvpress import KVPress, KNormPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -48,7 +48,6 @@ class OfflineModel(BaseModel):
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
         self.use_kvpress = True
-        self.presses=[]
         # You can change default self_attn_func here
         self.kvpress_policy = KNormPress(window_size=32, kernel_size=5) if KVPRESS_AVAILABLE else None
         
@@ -74,10 +73,6 @@ class OfflineModel(BaseModel):
 
         print(f"Loading local model: {self.model_name}...")
         try:
-            self.presses.append({"name":"knorm", "press": KNormPress(compression_ratio = 0.4)})
-            self.presses.append({"name":"Snap", "press": SnapKVPress(compression_ratio = 0.4)})
-            self.presses.append({"name":"Expected","press": ExpectedAttentionPress(compression_ratio = 0.4)})
-            self.presses.append({"name":"Finch", "press": FinchPress(compression_ratio = 0.4)})
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
             # Fix for Llama models that sometimes don't have pad_token
@@ -113,7 +108,6 @@ class OfflineModel(BaseModel):
             # Do not raise fatal error, set None to be handled in chat()
             self.model = None
             self.tokenizer = None
-        
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None):
         parser = HfArgumentParser((ModelArguments, DataArguments,
