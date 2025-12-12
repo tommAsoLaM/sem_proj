@@ -93,7 +93,7 @@ class OfflineModel(BaseModel):
             # [NEW] Initialize KVPress Wrapper on Model
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper...")
-                self.kvpress_instance = KVPress(self.model)
+                self.kvpress_instance = ExpectedAttentionPress(compression_ratio=0.4)
             
             self.pipeline = pipeline(
                 "text-generation",
