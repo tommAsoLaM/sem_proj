@@ -15,7 +15,7 @@ from lc_nl2sql.configs.data_args import DataArguments
 from lc_nl2sql.configs.model_args import FinetuningArguments, GeneratingArguments, ModelArguments
 from lc_nl2sql.llm_base.model import BaseModel
 
-# [NEW] Check for Flash Attention
+# Check for Flash Attention
 try:
     import flash_attn
     FLASH_ATTN_AVAILABLE = True
@@ -23,7 +23,7 @@ except ImportError:
     FLASH_ATTN_AVAILABLE = False
     logging.warning("Flash Attention not found. Install with 'pip install flash-attn --no-build-isolation'.")
 
-# [NEW] Import KVPress and desired Policy
+# Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
     
@@ -59,7 +59,7 @@ class OfflineModel(BaseModel):
         self.db_folder_path = ""
         self.db_tbl_col_vals_file = ""
         
-        # IMPORTANT: Load model immediately during initialization
+        # Load model immediately during initialization
         # This prevents 'NoneType' error on tokenizer later
         self.load_model()
 
@@ -79,7 +79,7 @@ class OfflineModel(BaseModel):
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
             
-            # [NEW] Determine attention implementation
+            # Determine attention implementation
             attn_impl = "flash_attention_2" if FLASH_ATTN_AVAILABLE else None
 
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -90,10 +90,10 @@ class OfflineModel(BaseModel):
                 attn_implementation=attn_impl # Add this argument
             )
             
-            # [NEW] Initialize KVPress Wrapper on Model
+            # Initialize KVPress Wrapper on Model
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper...")
-                # Pastikan ini membuat instance dari Press yang diinginkan
+                # Make sure this creates an instance of the desired Press
                 self.kvpress_instance = ExpectedAttentionPress(compression_ratio=0.4)
             
             self.pipeline = pipeline(
@@ -125,7 +125,7 @@ class OfflineModel(BaseModel):
             self.db_tbl_col_vals_file = args.get("db_tbl_col_vals_file", "db_tbl_col_vals_bird.pickle")
             self.ignore_hints = args.get("ignore_hints", False)
             
-            # [NEW] Get KVPress arguments from input args if present
+            # Get KVPress arguments from input args if present
             self.use_kvpress = args.get("use_kvpress", False)
         else:
             (
@@ -144,7 +144,7 @@ class OfflineModel(BaseModel):
             self.db_tbl_col_vals_file = self.data_args.db_tbl_col_vals_file
             self.ignore_hints = self.generating_args.ignore_hints
             
-            # [NEW] Default False if not in arguments
+            #Default False if not in arguments
             self.use_kvpress = getattr(self.generating_args, "use_kvpress", False)
         
         if self.ignore_hints:
@@ -154,7 +154,7 @@ class OfflineModel(BaseModel):
         if self.model is None:
             self.load_model()
 
-    # [NEW] Helper to dynamically change KVPress policy
+    # Helper to dynamically change KVPress policy
     def set_kvpress_policy(self, policy):
         """Sets self_attn_func (policy) for KVPress"""
         self.kvpress_policy = policy
@@ -242,17 +242,17 @@ class OfflineModel(BaseModel):
         """
         
         # 1. Compression & Preprocessing
-        # Biarkan ini tetap berjalan pada string mentah
+        # Keep this on raw string
         query = self._compress(query)
         query = self._remove_hints(query)
         
-        # [BARU] Terapkan Chat Template Llama-3 di sini
-        # Kita bungkus query yang sudah bersih ke dalam format pesan User
+        # Apply Llama-3 Chat Template here
+        # We wrap the cleaned query into a User message format
         try:
             messages = [{"role": "user", "content": query}]
             
-            # tokenize=False agar outputnya tetap string (tapi sudah ada tag <|user|> dll)
-            # add_generation_prompt=True agar model tahu giliran dia menjawab (<|assistant|>)
+            # tokenize=False so that output remains string (but with <|user|> tags etc)
+            # add_generation_prompt=True so the model knows it's its turn to answer (<|assistant|>)
             final_prompt = self.tokenizer.apply_chat_template(
                 messages, 
                 tokenize=False, 
@@ -273,11 +273,11 @@ class OfflineModel(BaseModel):
             # 2. Call Local Model
             outputs = None
             
-            # [PERBAIKAN] Mekanisme Fallback untuk KVPress
+            # [FIX] Fallback Mechanism for KVPress
             if self.use_kvpress and self.kvpress_instance:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    # Gunakan final_prompt di sini
+                    # Use final_prompt here
                     with self.kvpress_instance(self.model): 
                         outputs = self.pipeline(
                             final_prompt,  # <--- change 'query' into 'final_prompt'
@@ -292,10 +292,10 @@ class OfflineModel(BaseModel):
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     outputs = None
 
-            # Jika outputs masih None, jalankan mode normal
+            # If outputs is still None, run standard generation
             if outputs is None:
                 outputs = self.pipeline(
-                    final_prompt, # <--- GANTI 'query' JADI 'final_prompt'
+                    final_prompt, # <--- change 'query' into 'final_prompt'
                     max_new_tokens=512, 
                     do_sample=True if temperature > 0 else False,
                     temperature=temperature if temperature > 0 else 1.0,
