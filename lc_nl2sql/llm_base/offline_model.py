@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     
-    from kvpress import ExpectedAttentionPress
+    from kvpress import FinchPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -49,7 +49,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         self.use_kvpress = True
         # You can change default self_attn_func here
-        self.kvpress_policy = ExpectedAttentionPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = FinchPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -94,7 +94,7 @@ class OfflineModel(BaseModel):
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper...")
                 # Make sure this creates an instance of the desired Press
-                self.kvpress_instance = ExpectedAttentionPress(compression_ratio=0.4)
+                self.kvpress_instance = FinchPress(compression_ratio=0.4)
             
             self.pipeline = pipeline(
                 "text-generation",
