@@ -30,12 +30,17 @@ from lc_nl2sql.llm_base.model import BaseModel
 
 def count_token(model: BaseModel, predict_data: List[Dict], sample=True):
     tok_cnts = []
+    
+    # make sure the model is loaded only once
     if isinstance(model, GeminiModel):
-        model = GeminiModel()
-        model._load_model()
+        pass 
     else:
-        model = OfflineModel()
-        model.load_model()
+        # Logic for OfflineModel
+        # Check if the model is already loaded. If not, load it.
+        if not hasattr(model, 'tokenizer') or model.tokenizer is None:
+            print("Loading tokenizer for token counting...")
+            model.load_model()
+
     for i, item in enumerate(predict_data):
         if sample and i % 5 != 0:
             # Counting based on every other five questions
