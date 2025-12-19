@@ -185,10 +185,16 @@ def run_sqls_parallel(sqls, db_places, num_cpus=1, meta_time_out=30.0, gt_tied_q
     pool = mp.Pool(processes=num_cpus)
     for i, sql_pair in enumerate(sqls):
         predicted_sql, ground_truth = sql_pair
+        
+        gt_tied_sql = "" 
+
         if gt_tied_queries:
+            # Fill in gt_tied_sql if available
             gt_tied_sql = gt_tied_queries[i] if i in gt_tied_queries else ""
+            
         pool.apply_async(
             execute_model,
+            # fill in the arguments
             args=(predicted_sql, ground_truth, db_places[i], i, meta_time_out, gt_tied_sql, multi_sql_mode),
             callback=result_callback,
         )
