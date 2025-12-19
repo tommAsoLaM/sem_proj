@@ -365,7 +365,8 @@ class OfflineModel(BaseModel):
         """
         
         if not self.use_self_correction or query == "":
-            return sql, 0
+            # ADD, 0 (retry count)
+            return sql, 0, 0
 
         # --- Helper Functions (Same as api_model.py) ---
         def fix_error(s, err):
@@ -522,8 +523,11 @@ class OfflineModel(BaseModel):
         if retry_cnt >= max_retries:
             logging.info(f"Correction failed due to {err}: {_sql}")
             if not return_invalid:
-                return "", accumulated_token_count
-        return _sql, accumulated_token_count
+                # Add retry_cnt
+                return "", accumulated_token_count, retry_cnt
+        
+        # Add retry_cnt
+        return _sql, accumulated_token_count, retry_cnt
 
     def chat(self,
              query: str,
