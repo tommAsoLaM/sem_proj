@@ -153,6 +153,32 @@ def parallelized_inference(model: BaseModel, predict_data: List[Dict],
     return [res_dict[i] for i in range(len(predict_data))], extra_tokens, n_tries, latency, verify_latency, e2e_latency
 
 
+def clean_output(sql_content):
+    if not sql_content:
+        return ""
+    
+    # Delete markdown code blocks if there is (```sql ... ```
+    sql_content = re.sub(r'```sql', '', sql_content)
+    sql_content = re.sub(r'```', '', sql_content)
+
+    # Strategy 1: Find pattern SELECT ... ;
+    # This will capture a string that starts with SELECT and ends with ;
+    # The re.IGNORECASE flag makes it case-insensitive
+    # The re.DOTALL flag allows the dot (.) to match newlines (multiline SQL)
+    match = re.search(r"(SELECT.*?;)", sql_content, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # Strategy 2: If there is no semicolon (;), try to take the last line that looks like SQL
+    # or use old marker cleaning as a fallback
+    markers = ["###", "Let's verify", "Let’s verify", "Explanation:", "Analysis:"]
+    for marker in markers:
+        if marker in sql_content:
+            sql_content = sql_content.split(marker)[0]
+            
+    return sql_content.strip()
+
+
 def predict(model: BaseModel, dump_file=True):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
@@ -163,7 +189,8 @@ def predict(model: BaseModel, dump_file=True):
         with open(args.predicted_out_filename, "w") as f:
             for p in result:
                 try:
-                    f.write(p.replace("\n", " ") + "\n")
+                    cleaned_p = clean_output(p)
+                    f.write(cleaned_p.replace("\n", " ") + "\n")
                 except:
                     f.write("Invalid Output!\n")
         if model.measure_self_correction_tokens:
