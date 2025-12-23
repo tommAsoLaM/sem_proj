@@ -49,7 +49,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         self.use_kvpress = True
         # You can change default self_attn_func here
-        self.kvpress_policy = FinchPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = FinchPress(compression_ratio=0.4, window_size=32) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
