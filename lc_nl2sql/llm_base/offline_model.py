@@ -309,7 +309,27 @@ class OfflineModel(BaseModel):
             resp = outputs[0]['generated_text']
             
             # 3. Cleaning Response (Same as Gemini)
-            resp = resp.replace("```sql","").replace("```", "\n")
+            # [MODIFIED] Better extraction logic to handle verbose models
+            
+            # First, try to extract from markdown code blocks if present
+            sql_block = re.search(r"```sql\s*(.*?)\s*```", resp, re.DOTALL | re.IGNORECASE)
+            if sql_block:
+                resp = sql_block.group(1)
+            else:
+                # If no markdown, try to find SELECT ... ; (non-greedy match)
+                # This stops capturing at the first semicolon found
+                sql_semi = re.search(r"(SELECT.*?;)", resp, re.DOTALL | re.IGNORECASE)
+                if sql_semi:
+                    resp = sql_semi.group(1)
+                else:
+                    # Fallback: If no semicolon, take SELECT to the end
+                    sql_greedy = re.search(r"(SELECT.*)", resp, re.DOTALL | re.IGNORECASE)
+                    if sql_greedy:
+                        resp = sql_greedy.group(1)
+
+            # Remove common conversational prefixes if they stuck inside
+            resp = resp.replace("```sql", "").replace("```", "")
+            
             if "<FINAL_ANSWER>" in resp:
                 resp = resp.split("<FINAL_ANSWER>")[1].split("</FINAL_ANSWER>")[0]
                 
@@ -333,10 +353,10 @@ class OfflineModel(BaseModel):
         resp = re.sub(r"^ite\s+", "", resp)
         resp = re.sub('\s+', ' ', resp).strip()
         
-        # Take only the SELECT part
-        sql_match = re.search(r"SELECT.*", resp, re.IGNORECASE | re.DOTALL)
-        if sql_match:
-            resp = sql_match.group(0)
+        # [MODIFIED] Final check to ensure we don't have trailing text after semicolon
+        # If the string contains a semicolon, cut everything after it
+        if ";" in resp:
+            resp = resp.split(";")[0] + ";"
 
         return resp, max_retries
 
