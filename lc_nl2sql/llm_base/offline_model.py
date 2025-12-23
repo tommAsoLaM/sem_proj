@@ -279,8 +279,8 @@ class OfflineModel(BaseModel):
                 try:
                     logging.info(f"Generating with KVPress instance")
                     # Use final_prompt here
-                    # Pass window_size here if the library requires it during the context call
-                    with self.kvpress_instance(self.model, window_size=32): 
+                    # REMOVED window_size argument causing error
+                    with self.kvpress_instance(self.model): 
                         outputs = self.pipeline(
                             final_prompt,  # <--- change 'query' into 'final_prompt'
                             max_new_tokens=512,
