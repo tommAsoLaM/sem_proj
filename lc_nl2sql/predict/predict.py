@@ -162,7 +162,7 @@ def clean_output(sql_content):
     sql_content = re.sub(r'```', '', sql_content)
 
     # Strategy 1: Find pattern SELECT ... ;
-    # This will capture a string that starts with SELECT and ends with ;
+    # This will capture a string that starts with SELECT and ends with;
     # The re.IGNORECASE flag makes it case-insensitive
     # The re.DOTALL flag allows the dot (.) to match newlines (multiline SQL)
     match = re.search(r"(SELECT.*?;)", sql_content, re.IGNORECASE | re.DOTALL)
@@ -189,8 +189,12 @@ def predict(model: BaseModel, dump_file=True):
         with open(args.predicted_out_filename, "w") as f:
             for p in result:
                 try:
-                    cleaned_p = clean_output(p)
-                    f.write(cleaned_p.replace("\n", " ") + "\n")
+                    # [MODIFIED] Commented out clean_output temporarily
+                    # cleaned_p = clean_output(p)
+                    # f.write(cleaned_p.replace("\n", " ") + "\n")
+                    
+                    # [NEW] Write raw output directly (replacing newlines to keep 1 line per entry)
+                    f.write(p.replace("\n", " ") + "\n")
                 except:
                     f.write("Invalid Output!\n")
         if model.measure_self_correction_tokens:
