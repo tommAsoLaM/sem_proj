@@ -143,7 +143,7 @@ Also consider some useful "Hints" if provided.
 ***************************
 Now generate SQLite SQL query to answer the given "Question".
 
-Output the SQL query string ONLY.
+Output the SQL query string ONLY. Make sure it is a single SQL statement. Do not provide any explanation, reasoning, or comments. Start the response with 'SELECT' and end with ';'.
 """
 
 COLUMN_SELECTOR_TEMPLATE= """
