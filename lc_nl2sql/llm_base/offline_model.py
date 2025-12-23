@@ -278,11 +278,11 @@ class OfflineModel(BaseModel):
             if self.use_kvpress and self.kvpress_instance:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    # Use final_prompt here
-                    # REMOVED window_size argument causing error
-                    with self.kvpress_instance(self.model): 
+                    
+                    #Use windows_size 4096, if that fails, fallback to 2048
+                    with self.kvpress_instance(self.model, window_size=4096): 
                         outputs = self.pipeline(
-                            final_prompt,  # <--- change 'query' into 'final_prompt'
+                            final_prompt,
                             max_new_tokens=512,
                             do_sample=True if temperature > 0 else False,
                             temperature=temperature if temperature > 0 else 1.0,
@@ -297,7 +297,7 @@ class OfflineModel(BaseModel):
             # If outputs is still None, run standard generation
             if outputs is None:
                 outputs = self.pipeline(
-                    final_prompt, # <--- change 'query' into 'final_prompt'
+                    final_prompt,
                     max_new_tokens=512, 
                     do_sample=True if temperature > 0 else False,
                     temperature=temperature if temperature > 0 else 1.0,
