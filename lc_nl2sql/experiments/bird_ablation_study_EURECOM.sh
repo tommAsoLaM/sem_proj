@@ -151,7 +151,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_5_disambiguation"
 echo "---------------------------------------"
 echo "Ablation 6. + synthetic examples"
-  python lc_nl2sql/data_process/sql_data_process.py \
+poetry run python lc_nl2sql/data_process/sql_data_process.py \
   --input_data_path lc_nl2sql/data/bird/dev/dev_trim.json \
   --input_table_path lc_nl2sql/data/bird/dev/dev_tables.json \
   --output_file_path lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
@@ -197,7 +197,7 @@ poetry run python lc_nl2sql/predict/count_verify_token.py \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_7_verify_retry_verify"
 
 echo "---------------------------------------"
-# Ablation for without hints
+echo "Ablation for without hints"
 poetry run python lc_nl2sql/predict/predict.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
   --num_beams 10 \

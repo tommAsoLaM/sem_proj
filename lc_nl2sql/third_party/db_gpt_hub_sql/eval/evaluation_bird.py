@@ -321,6 +321,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--output_csv_path", type=str, default="evaluation_result.csv", help="Path to save the evaluation result CSV")
 
     args = args_parser.parse_args()
+    print(f"Evaluating predicted SQL file: {args.predicted_sql_path}")
     exec_result = []
 
     if args.sql_candidates_path:
