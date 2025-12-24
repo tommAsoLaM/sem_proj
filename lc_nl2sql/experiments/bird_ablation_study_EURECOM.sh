@@ -51,7 +51,7 @@ poetry run python lc_nl2sql/data_process/sql_data_process.py \
   --num_col_values 0 \
   --use_hint 0 \
   --use_rules 0 \
-  --use_column_filtering 1 \
+  --use_column_filtering 0 \
   --synthetic_examples 1 \
   --num_examples 0
 
@@ -159,7 +159,7 @@ echo "Ablation 6. + synthetic examples"
   --num_col_values 10 \
   --use_hint 1 \
   --use_rules 0 \
-  --use_column_filtering 1 \
+  --use_column_filtering 0 \
   --synthetic_examples 1 \
   --num_examples 100
 
