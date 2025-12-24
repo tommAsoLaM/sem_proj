@@ -67,7 +67,7 @@ poetry run python lc_nl2sql/predict/predict.py \
 poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_1.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_1_all_tables"
-
+echo "---------------------------------------"
 echo "Ablation 2. + hint"
 poetry run python lc_nl2sql/data_process/sql_data_process.py \
   --input_data_path lc_nl2sql/data/bird/dev/dev_trim.json \
@@ -93,7 +93,7 @@ poetry run python lc_nl2sql/predict/predict.py \
 poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_2.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_2_hint"
-
+echo "---------------------------------------"
 echo "Ablation 3. + distinct column values"
 poetry run python lc_nl2sql/data_process/sql_data_process.py \
   --input_data_path lc_nl2sql/data/bird/dev/dev_trim.json \
@@ -119,7 +119,7 @@ poetry run python lc_nl2sql/predict/predict.py \
 poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_3_col_values"
-
+echo "---------------------------------------"
 echo "Ablation 4. + self correction"
 # share the data from 3
 poetry run python lc_nl2sql/predict/predict.py \
@@ -134,7 +134,7 @@ poetry run python lc_nl2sql/predict/predict.py \
 poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_4_self_correction"
-
+echo "---------------------------------------"
 echo "Ablation 5. + disambiguation"
 # share the data from 3 & 4.
 poetry run python lc_nl2sql/predict/predict.py \
@@ -149,7 +149,7 @@ poetry run python lc_nl2sql/predict/predict.py \
 poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_5_disambiguation"
-
+echo "---------------------------------------"
 echo "Ablation 6. + synthetic examples"
   python lc_nl2sql/data_process/sql_data_process.py \
   --input_data_path lc_nl2sql/data/bird/dev/dev.json \
@@ -176,7 +176,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_6_synthetic_examples"
 
-
+echo "---------------------------------------"
 echo "Ablation 7. + verify & retry"
 # share the data from 6.
 poetry run python lc_nl2sql/predict/predict.py \
@@ -196,6 +196,7 @@ poetry run python lc_nl2sql/predict/count_verify_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_7_verify_retry_verify"
 
+echo "---------------------------------------"
 # Ablation for without hints
 poetry run python lc_nl2sql/predict/predict.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
