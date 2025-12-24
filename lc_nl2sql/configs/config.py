@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+#from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 ### path config
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
