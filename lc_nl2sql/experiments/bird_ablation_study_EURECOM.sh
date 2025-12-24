@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ----THIS IS AN EDITED BASH FILE FOR EURECOM SEMESTER PROJECT, INSPIRED BY ORIGINAL GOOGLE CODE----
+# ----THIS IS AN EDITED BASH FILE FOR EURECOM SEMESTER PROJECT (RAHMANTO, LA MALFA) INSPIRED BY ORIGINAL GOOGLE CODE----
 
 # Copyright 2025 Google LLC
 #
@@ -65,7 +65,7 @@ poetry run python lc_nl2sql/predict/predict.py \
   --predicted_out_filename "lc_nl2sql/output/pred/bird_ablation_1_all_tables"
 
 poetry run python lc_nl2sql/predict/count_token.py \
-  --predicted_input_filename lc_nl2sql/data/bird/dev/dev_trim_processed_ablation_1.json \
+  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_1.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_1_all_tables"
 
 echo "Ablation 2. + hint"
@@ -132,13 +132,13 @@ poetry run python lc_nl2sql/predict/predict.py \
   --predicted_out_filename "lc_nl2sql/output/pred/bird_ablation_4_self_correction"
 
 poetry run python lc_nl2sql/predict/count_token.py \
-  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_4.json \
+  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_4_self_correction"
 
 echo "Ablation 5. + disambiguation"
 # share the data from 3 & 4.
 poetry run python lc_nl2sql/predict/predict.py \
-  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_4.json \
+  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --num_beams 1 \
   --temperature 0.5 \
   --use_self_correction 1 \
@@ -147,7 +147,7 @@ poetry run python lc_nl2sql/predict/predict.py \
   --predicted_out_filename "lc_nl2sql/output/pred/bird_ablation_5_disambiguation"
 
 poetry run python lc_nl2sql/predict/count_token.py \
-  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_4.json \
+  --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_5_disambiguation"
 
 echo "Ablation 6. + synthetic examples"
