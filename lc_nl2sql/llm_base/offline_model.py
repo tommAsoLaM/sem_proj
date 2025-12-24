@@ -49,7 +49,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         self.use_kvpress = True
         # You can change default self_attn_func here
-        self.kvpress_policy = FinchPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = FinchPress(compression_ratio=0.4, window_size=2048) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -94,7 +94,7 @@ class OfflineModel(BaseModel):
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper...")
                 # Make sure this creates an instance of the desired Press
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                self.kvpress_instance = FinchPress(compression_ratio=0.4, window_size=2048)
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
             
             self.pipeline = pipeline(
@@ -280,7 +280,7 @@ class OfflineModel(BaseModel):
                     logging.info(f"Generating with KVPress instance")
                     
                     #Use windows_size 4096, if that fails, fallback to 2048
-                    with self.kvpress_instance(self.model, window_size=4096): 
+                    with self.kvpress_instance(self.model): 
                         outputs = self.pipeline(
                             final_prompt,
                             max_new_tokens=512,
