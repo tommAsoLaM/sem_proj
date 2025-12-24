@@ -152,7 +152,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 echo "---------------------------------------"
 echo "Ablation 6. + synthetic examples"
   python lc_nl2sql/data_process/sql_data_process.py \
-  --input_data_path lc_nl2sql/data/bird/dev/dev.json \
+  --input_data_path lc_nl2sql/data/bird/dev/dev_trim.json \
   --input_table_path lc_nl2sql/data/bird/dev/dev_tables.json \
   --output_file_path lc_nl2sql/data/bird/dev/ablation/dev_example_synthetic_examples_100.json \
   --db_folder_path lc_nl2sql/data/bird/dev/dev_databases \
