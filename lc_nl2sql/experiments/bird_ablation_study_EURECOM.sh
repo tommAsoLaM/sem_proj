@@ -120,7 +120,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
   --predicted_out_filename "lc_nl2sql/output/pred/token_count/bird_ablation_3_col_values"
 
-# echo "Ablation 4. + self correction"
+echo "Ablation 4. + self correction"
 # share the data from 3
 poetry run python lc_nl2sql/predict/predict.py \
   --predicted_input_filename lc_nl2sql/data/bird/dev/ablation/dev_trim_processed_ablation_3.json \
