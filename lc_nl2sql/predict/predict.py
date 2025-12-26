@@ -157,6 +157,12 @@ def clean_output(sql_content):
     if not sql_content:
         return ""
     
+    # [NEW CODE START] Check for XML tags first
+    tag_match = re.search(r"<FINAL_SQL>\s*(.*?)\s*</FINAL_SQL>", sql_content, re.DOTALL | re.IGNORECASE)
+    if tag_match:
+        return tag_match.group(1).strip()
+    # [NEW CODE END]
+
     # Delete markdown code blocks if there is (```sql ... ```
     sql_content = re.sub(r'```sql', '', sql_content)
     sql_content = re.sub(r'```', '', sql_content)
@@ -189,12 +195,12 @@ def predict(model: BaseModel, dump_file=True):
         with open(args.predicted_out_filename, "w") as f:
             for p in result:
                 try:
-                    # [MODIFIED] Commented out clean_output temporarily
-                    # cleaned_p = clean_output(p)
-                    # f.write(cleaned_p.replace("\n", " ") + "\n")
+                    # [MODIFIED] Uncomment clean_output to ensure clean SQL
+                    cleaned_p = clean_output(p)
+                    f.write(cleaned_p.replace("\n", " ") + "\n")
                     
-                    # [NEW] Write raw output directly (replacing newlines to keep 1 line per entry)
-                    f.write(p.replace("\n", " ") + "\n")
+                    # [OLD] Write raw output directly
+                    # f.write(p.replace("\n", " ") + "\n")
                 except:
                     f.write("Invalid Output!\n")
         if model.measure_self_correction_tokens:

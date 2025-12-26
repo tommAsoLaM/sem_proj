@@ -112,7 +112,17 @@ Also consider the "Rules" and some useful "Hints" if provided.
 ***************************
 Now generate SQLite SQL query to answer the given "Question".
 
-Output the SQL query string ONLY, and make sure it is a single SQL statement. Do not provide any explanation, reasoning, or comments. Start the response with 'SELECT' and end with ';'.
+Produce exactly two blocks in this order and nothing else (no preface, no markdown fences, no extra lines):
+<COT>
+ (your reasoning here)
+</COT>
+<FINAL_SQL>
+ (one single SQL statement ending with a semicolon)
+</FINAL_SQL>
+Rules:
+1. Do not put SQL inside <COT>
+2. <FINAL_SQL> must contain only the SQL (no commentary, no backticks, no ``` fences)
+3. Do not include any other tags or text outside these blocks
 """
 
 BASIC_INSTRUCTION_PROMPT_NO_RULES = """\
@@ -143,7 +153,17 @@ Also consider some useful "Hints" if provided.
 ***************************
 Now generate SQLite SQL query to answer the given "Question".
 
-Output the SQL query string ONLY. Make sure it is a single SQL statement. Do not provide any explanation, reasoning, or comments. Start the response with 'SELECT' and end with ';'.
+Produce exactly two blocks in this order and nothing else (no preface, no markdown fences, no extra lines):
+<COT>
+ (your reasoning here)
+</COT>
+<FINAL_SQL>
+ (one single SQL statement ending with a semicolon)
+</FINAL_SQL>
+Rules:
+1. Do not put SQL inside <COT>
+2. <FINAL_SQL> must contain only the SQL (no commentary, no backticks, no ``` fences)
+3. Do not include any other tags or text outside these blocks
 """
 
 COLUMN_SELECTOR_TEMPLATE= """

@@ -311,21 +311,27 @@ class OfflineModel(BaseModel):
             # 3. Cleaning Response (Same as Gemini)
             # [MODIFIED] Better extraction logic to handle verbose models
             
-            # First, try to extract from markdown code blocks if present
-            sql_block = re.search(r"```sql\s*(.*?)\s*```", resp, re.DOTALL | re.IGNORECASE)
-            if sql_block:
-                resp = sql_block.group(1)
+            # [NEW CODE START] Prioritize extracting from <FINAL_SQL> tags
+            final_sql_match = re.search(r"<FINAL_SQL>\s*(.*?)\s*</FINAL_SQL>", resp, re.DOTALL | re.IGNORECASE)
+            if final_sql_match:
+                resp = final_sql_match.group(1).strip()
             else:
-                # If no markdown, try to find SELECT ... ; (non-greedy match)
-                # This stops capturing at the first semicolon found
-                sql_semi = re.search(r"(SELECT.*?;)", resp, re.DOTALL | re.IGNORECASE)
-                if sql_semi:
-                    resp = sql_semi.group(1)
+                # Fallback to old logic if tags are missing (just in case)
+                # First, try to extract from markdown code blocks if present
+                sql_block = re.search(r"```sql\s*(.*?)\s*```", resp, re.DOTALL | re.IGNORECASE)
+                if sql_block:
+                    resp = sql_block.group(1)
                 else:
-                    # Fallback: If no semicolon, take SELECT to the end
-                    sql_greedy = re.search(r"(SELECT.*)", resp, re.DOTALL | re.IGNORECASE)
-                    if sql_greedy:
-                        resp = sql_greedy.group(1)
+                    # If no markdown, try to find SELECT ... ; (non-greedy match)
+                    sql_semi = re.search(r"(SELECT.*?;)", resp, re.DOTALL | re.IGNORECASE)
+                    if sql_semi:
+                        resp = sql_semi.group(1)
+                    else:
+                        # Fallback: If no semicolon, take SELECT to the end
+                        sql_greedy = re.search(r"(SELECT.*)", resp, re.DOTALL | re.IGNORECASE)
+                        if sql_greedy:
+                            resp = sql_greedy.group(1)
+            # [NEW CODE END]
 
             # Remove common conversational prefixes if they stuck inside
             resp = resp.replace("```sql", "").replace("```", "")
