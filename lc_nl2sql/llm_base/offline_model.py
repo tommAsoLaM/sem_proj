@@ -47,7 +47,7 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.use_kvpress = True
+        self.use_kvpress = False # Disable KVPress default
         # You can change default self_attn_func here
         self.kvpress_policy = FinchPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
         
@@ -91,7 +91,7 @@ class OfflineModel(BaseModel):
             )
             
             # Initialize KVPress Wrapper on Model
-            if KVPRESS_AVAILABLE:
+            if KVPRESS_AVAILABLE and self.use_kvpress:
                 print("Initializing KVPress wrapper...")
                 # Make sure this creates an instance of the desired Press
                 self.kvpress_instance = FinchPress(compression_ratio=0.4)
