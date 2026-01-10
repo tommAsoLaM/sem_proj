@@ -26,8 +26,8 @@ except ImportError:
 # Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
-    
-    from kvpress import FinchPress
+    # CHANGE: Import ChunkPress instead of FinchPress
+    from kvpress import ChunkPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -37,7 +37,6 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 
 class OfflineModel(BaseModel):
-# old model: meta-llama/Llama-3.2-1B-Instruct
     def __init__(self, model_name:str = "Qwen/Qwen3-4B-Instruct-2507") -> None:
         # Initialize local model variables
         self.model_name = model_name
@@ -48,8 +47,8 @@ class OfflineModel(BaseModel):
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
         self.use_kvpress = False # Disable KVPress default
-        # You can change default self_attn_func here
-        self.kvpress_policy = FinchPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
+        # CHANGE: Use ChunkPress
+        self.kvpress_policy = ChunkPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -92,9 +91,9 @@ class OfflineModel(BaseModel):
             
             # Initialize KVPress Wrapper on Model
             if KVPRESS_AVAILABLE and self.use_kvpress:
-                print("Initializing KVPress wrapper...")
-                # Make sure this creates an instance of the desired Press
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                print("Initializing KVPress wrapper (ChunkPress)...")
+                # CHANGE: Instantiate ChunkPress
+                self.kvpress_instance = ChunkPress(compression_ratio=0.4)
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
             
             self.pipeline = pipeline(
