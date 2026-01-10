@@ -46,7 +46,7 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.use_kvpress = False # Disable KVPress default
+        self.use_kvpress = True # Disable KVPress default
         # CHANGE: Use ChunkPress with KnormPress as base
         if KVPRESS_AVAILABLE:
             base_press = KnormPress(compression_ratio=0.4)
