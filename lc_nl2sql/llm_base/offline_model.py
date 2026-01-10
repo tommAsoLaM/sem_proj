@@ -26,8 +26,8 @@ except ImportError:
 # Import KVPress and desired Policy
 # Ensure kvpress library is installed or in path
 try:
-    # CHANGE: Import ChunkPress instead of FinchPress
-    from kvpress import ChunkPress
+    # CHANGE: Import ChunkPress and KnormPress (needed as base for ChunkPress)
+    from kvpress import ChunkPress, KnormPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -47,8 +47,12 @@ class OfflineModel(BaseModel):
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
         self.use_kvpress = False # Disable KVPress default
-        # CHANGE: Use ChunkPress
-        self.kvpress_policy = ChunkPress() if KVPRESS_AVAILABLE else None
+        # CHANGE: Use ChunkPress with KnormPress as base
+        if KVPRESS_AVAILABLE:
+            base_press = KnormPress(compression_ratio=0.4)
+            self.kvpress_policy = ChunkPress(press=base_press)
+        else:
+            self.kvpress_policy = None
         
         # Default config
         self.temperature = 0.5
@@ -92,8 +96,10 @@ class OfflineModel(BaseModel):
             # Initialize KVPress Wrapper on Model
             if KVPRESS_AVAILABLE and self.use_kvpress:
                 print("Initializing KVPress wrapper (ChunkPress)...")
-                # CHANGE: Instantiate ChunkPress
-                self.kvpress_instance = ChunkPress()
+                # CHANGE: Instantiate ChunkPress wrapping KnormPress
+                # 0.4 compression ratio means we remove 40% (or keep 60% depending on impl, usually remove)
+                base_press = KnormPress(compression_ratio=0.4)
+                self.kvpress_instance = ChunkPress(press=base_press)
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
             
             self.pipeline = pipeline(
