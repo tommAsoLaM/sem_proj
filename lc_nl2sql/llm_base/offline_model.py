@@ -48,7 +48,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         self.use_kvpress = False # Disable KVPress default
         # CHANGE: Use ChunkPress
-        self.kvpress_policy = ChunkPress(compression_ratio=0.4) if KVPRESS_AVAILABLE else None
+        self.kvpress_policy = ChunkPress() if KVPRESS_AVAILABLE else None
         
         # Default config
         self.temperature = 0.5
@@ -93,7 +93,7 @@ class OfflineModel(BaseModel):
             if KVPRESS_AVAILABLE and self.use_kvpress:
                 print("Initializing KVPress wrapper (ChunkPress)...")
                 # CHANGE: Instantiate ChunkPress
-                self.kvpress_instance = ChunkPress(compression_ratio=0.4)
+                self.kvpress_instance = ChunkPress()
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
             
             self.pipeline = pipeline(
