@@ -312,7 +312,17 @@ class OfflineModel(BaseModel):
                     pad_token_id=self.tokenizer.eos_token_id
                 )
             
-            resp = outputs[0]['generated_text']
+            # [CHANGE] Handle output format differences between standard pipeline and KVPress
+            if isinstance(outputs, dict) and "answer" in outputs:
+                # KVPress returns a dictionary with 'answer' key
+                resp = outputs["answer"]
+            elif isinstance(outputs, list) and len(outputs) > 0:
+                # Standard pipeline returns a list of dicts
+                resp = outputs[0].get('generated_text', '')
+            else:
+                # Fallback
+                logging.warning(f"Unexpected output format: {type(outputs)}")
+                resp = str(outputs)
             
             # 3. Cleaning Response (Same as Gemini)
             # [MODIFIED] Better extraction logic to handle verbose models
