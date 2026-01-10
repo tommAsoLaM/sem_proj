@@ -93,16 +93,18 @@ class OfflineModel(BaseModel):
             )
             
             # Initialize KVPress Wrapper on Model
+            task_name = "text-generation"
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper (ChunkPress)...")
                 # CHANGE: Instantiate ChunkPress wrapping KnormPress
                 # 0.4 compression ratio means we remove 40% (or keep 60% depending on impl, usually remove)
                 base_press = KnormPress(compression_ratio=0.4)
                 self.kvpress_instance = ChunkPress(press=base_press)
-                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                # Removed manual update_model_and_tokenizer; usage will be via pipeline argument
+                task_name = "kv-press-text-generation"
             
             self.pipeline = pipeline(
-                "text-generation",
+                task_name,
                 model=self.model,
                 tokenizer=self.tokenizer,
                 torch_dtype=torch.float16,
@@ -283,17 +285,17 @@ class OfflineModel(BaseModel):
                 try:
                     logging.info(f"Generating with KVPress instance")
                     
-                    #Use windows_size 4096, if that fails, fallback to 2048
-                    with self.kvpress_instance(self.model): 
-                        outputs = self.pipeline(
-                            final_prompt,
-                            max_new_tokens=512,
-                            do_sample=True if temperature > 0 else False,
-                            temperature=temperature if temperature > 0 else 1.0,
-                            top_p=0.9,
-                            return_full_text=False,
-                            pad_token_id=self.tokenizer.eos_token_id
-                        )
+                    # Passed press instance directly to pipeline (kv-press-text-generation)
+                    outputs = self.pipeline(
+                        final_prompt,
+                        max_new_tokens=512,
+                        do_sample=True if temperature > 0 else False,
+                        temperature=temperature if temperature > 0 else 1.0,
+                        top_p=0.9,
+                        return_full_text=False,
+                        pad_token_id=self.tokenizer.eos_token_id,
+                        press=self.kvpress_instance
+                    )
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     outputs = None
