@@ -46,7 +46,6 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.use_kvpress = True # Disable KVPress default
         # CHANGE: Use ChunkPress with KnormPress as base
         if KVPRESS_AVAILABLE:
             base_press = KnormPress(compression_ratio=0.4)
@@ -94,7 +93,7 @@ class OfflineModel(BaseModel):
             )
             
             # Initialize KVPress Wrapper on Model
-            if KVPRESS_AVAILABLE and self.use_kvpress:
+            if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper (ChunkPress)...")
                 # CHANGE: Instantiate ChunkPress wrapping KnormPress
                 # 0.4 compression ratio means we remove 40% (or keep 60% depending on impl, usually remove)
