@@ -133,7 +133,7 @@ class OfflineModel(BaseModel):
             self.ignore_hints = args.get("ignore_hints", False)
             
             # Get KVPress arguments from input args if present
-            self.use_kvpress = args.get("use_kvpress", False)
+            self.use_kvpress = args.get("use_kvpress", True)
         else:
             (
                 model_args,
@@ -152,7 +152,7 @@ class OfflineModel(BaseModel):
             self.ignore_hints = self.generating_args.ignore_hints
             
             #Default False if not in arguments
-            self.use_kvpress = getattr(self.generating_args, "use_kvpress", False)
+            self.use_kvpress = getattr(self.generating_args, "use_kvpress", True)
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
