@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     # CHANGE: Import ChunkPress and KnormPress (needed as base for ChunkPress)
-    from kvpress import ChunkPress, KnormPress
+    from kvpress import FinchPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -48,8 +48,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         # CHANGE: Use ChunkPress with KnormPress as base
         if KVPRESS_AVAILABLE:
-            base_press = KnormPress(compression_ratio=0.4)
-            self.kvpress_policy = ChunkPress(press=base_press)
+            self.kvpress_policy = FinchPress(compression_ratio=0.4)
         else:
             self.kvpress_policy = None
         
@@ -95,11 +94,8 @@ class OfflineModel(BaseModel):
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
-                print("Initializing KVPress wrapper (ChunkPress)...")
-                # CHANGE: Instantiate ChunkPress wrapping KnormPress
-                # 0.4 compression ratio means we remove 40% (or keep 60% depending on impl, usually remove)
-                base_press = KnormPress(compression_ratio=0.4)
-                self.kvpress_instance = ChunkPress(press=base_press)
+                print("Initializing KVPress wrapper")
+                self.kvpress_instance = FinchPress(compression_ratio=0.4)
                 # Removed manual update_model_and_tokenizer; usage will be via pipeline argument
                 task_name = "kv-press-text-generation"
             
