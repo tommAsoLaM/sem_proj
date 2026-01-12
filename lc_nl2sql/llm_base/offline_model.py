@@ -96,8 +96,10 @@ class OfflineModel(BaseModel):
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper")
                 self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
                 # Removed manual update_model_and_tokenizer; usage will be via pipeline argument
                 task_name = "kv-press-text-generation"
+                
             
             self.pipeline = pipeline(
                 task_name,
