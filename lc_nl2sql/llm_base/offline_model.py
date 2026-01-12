@@ -48,7 +48,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         # CHANGE: Use ChunkPress with KnormPress as base
         if KVPRESS_AVAILABLE:
-            self.kvpress_policy = FinchPress(compression_ratio=0.4)
+            self.kvpress_policy = FinchPress(compression_ratio=0.4, window_size=32)
         else:
             self.kvpress_policy = None
         
@@ -95,9 +95,13 @@ class OfflineModel(BaseModel):
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper")
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                # Ensure window_size is provided as required by FinchPress
+                self.kvpress_instance = FinchPress(compression_ratio=0.4, window_size=32)
+                
+                # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                # Removed manual update_model_and_tokenizer; usage will be via pipeline argument
+                
+                # Use the specific task name if available/registered by kvpress
                 task_name = "kv-press-text-generation"
                 
             
