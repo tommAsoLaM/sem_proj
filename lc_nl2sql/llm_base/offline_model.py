@@ -46,11 +46,7 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        # CHANGE: Use ChunkPress with KnormPress as base
-        if KVPRESS_AVAILABLE:
-            self.kvpress_policy = FinchPress(compression_ratio=0.4)
-        else:
-            self.kvpress_policy = None
+        
         
         # Default config
         self.temperature = 0.5
