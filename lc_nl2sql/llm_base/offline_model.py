@@ -48,7 +48,7 @@ class OfflineModel(BaseModel):
         self.kvpress_instance = None
         # CHANGE: Use ChunkPress with KnormPress as base
         if KVPRESS_AVAILABLE:
-            self.kvpress_policy = FinchPress(compression_ratio=0.4, window_size=32)
+            self.kvpress_policy = FinchPress(compression_ratio=0.4)
         else:
             self.kvpress_policy = None
         
@@ -96,7 +96,7 @@ class OfflineModel(BaseModel):
             if KVPRESS_AVAILABLE:
                 print("Initializing KVPress wrapper")
                 # Ensure window_size is provided as required by FinchPress
-                self.kvpress_instance = FinchPress(compression_ratio=0.4, window_size=32)
+                self.kvpress_instance = FinchPress(compression_ratio=0.4)
                 
                 # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
