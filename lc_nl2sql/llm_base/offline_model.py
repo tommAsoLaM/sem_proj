@@ -287,9 +287,8 @@ class OfflineModel(BaseModel):
                     outputs = self.pipeline(
                         final_prompt,
                         max_new_tokens=512,
-                        do_sample=True if temperature > 0 else False,
-                        temperature=temperature if temperature > 0 else 1.0,
-                        top_p=0.9,
+                        do_sample=False,
+                        top_p=1,
                         return_full_text=False,
                         pad_token_id=self.tokenizer.eos_token_id,
                         press=self.kvpress_instance
@@ -303,9 +302,8 @@ class OfflineModel(BaseModel):
                 outputs = self.pipeline(
                     final_prompt,
                     max_new_tokens=512, 
-                    do_sample=True if temperature > 0 else False,
-                    temperature=temperature if temperature > 0 else 1.0,
-                    top_p=0.9,
+                    do_sample=False,
+                    top_p=1,
                     return_full_text=False,
                     pad_token_id=self.tokenizer.eos_token_id
                 )
