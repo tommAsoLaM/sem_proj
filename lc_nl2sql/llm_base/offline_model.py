@@ -43,6 +43,7 @@ class OfflineModel(BaseModel):
         self.model = None
         self.tokenizer = None
         self.pipeline = None
+        self.kvpress_pipeline = None  # KVPress-aware pipeline
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
@@ -100,6 +101,8 @@ class OfflineModel(BaseModel):
                 torch_dtype=torch.float16,
                 device_map="auto"
             )
+            # KVPress pipeline gets (re)built in _initialize_kvpress
+            self.kvpress_pipeline = None
             print("Model loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to load model: {e}")
@@ -120,10 +123,19 @@ class OfflineModel(BaseModel):
                 self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
             
             self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+            # Build KVPress-aware pipeline as recommended by kvpress docs
+            self.kvpress_pipeline = pipeline(
+                "kv-press-text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                torch_dtype=torch.float16,
+                device_map="auto",
+            )
             logging.info(f"KVPress initialized: {self.kvpress_policy} with compression_ratio={self.compression_ratio}")
         except Exception as e:
             logging.error(f"Failed to initialize KVPress: {e}")
             self.kvpress_instance = None
+            self.kvpress_pipeline = None
     
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None):
@@ -319,22 +331,26 @@ class OfflineModel(BaseModel):
         try:
             # 2. Call Local Model
             outputs = None
+            resp = None
             
             # [FIX] Fallback Mechanism for KVPress
-            if self.use_kvpress and self.kvpress_instance:
+            if self.use_kvpress and self.kvpress_instance and self.kvpress_pipeline:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    inputs = self.tokenizer(final_prompt, return_tensors = "pt")
-                    # Passed press instance directly to pipeline (kv-press-text-generation)
-                    gen_ids = self.model.generate(
-                        **inputs,
+                    outputs = self.kvpress_pipeline(
+                        final_prompt,
                         max_new_tokens=512,
                         do_sample=False,
                         top_p=1,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        attention_compressor=self.kvpress_instance  # <- KVPress arg
+                        press=self.kvpress_instance,
                     )
-                    resp = self.tokenizer.decode(gen_ids[0], skip_special_tokens = True)
+                    if isinstance(outputs, dict):
+                        resp = outputs.get("answer", "")
+                    elif isinstance(outputs, list) and len(outputs) > 0 and isinstance(outputs[0], dict):
+                        resp = outputs[0].get("answer", "")
+                    else:
+                        resp = None
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     resp = None
@@ -349,17 +365,15 @@ class OfflineModel(BaseModel):
                     return_full_text=False,
                     pad_token_id=self.tokenizer.eos_token_id,
                 )
-                resp = inputs[0].get('generated_text', '')
+                if isinstance(outputs, list) and len(outputs) > 0:
+                    resp = outputs[0].get('generated_text', '')
+                elif isinstance(outputs, dict):
+                    resp = outputs.get('generated_text', '')
+                else:
+                    resp = str(outputs)
             
             # [CHANGE] Handle output format differences between standard pipeline and KVPress
-            if isinstance(outputs, dict) and "answer" in outputs:
-                # KVPress returns a dictionary with 'answer' key
-                resp = outputs["answer"]
-            elif isinstance(outputs, list) and len(outputs) > 0:
-                # Standard pipeline returns a list of dicts
-                resp = outputs[0].get('generated_text', '')
-            else:
-                # Fallback
+            if resp is None:
                 logging.warning(f"Unexpected output format: {type(outputs)}")
                 resp = str(outputs)
             
