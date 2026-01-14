@@ -347,7 +347,7 @@ class OfflineModel(BaseModel):
                     do_sample=False,
                     top_p=1,
                     return_full_text=False,
-                    pad_token_id=self.tokenizer.eos_token_id
+                    pad_token_id=self.tokenizer.eos_token_id,
                 )
                 resp = inputs[0].get('generated_text', '')
             
