@@ -324,23 +324,23 @@ class OfflineModel(BaseModel):
             if self.use_kvpress and self.kvpress_instance:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    
+                    inputs  =self.tokenizer(final_promt, return_tensors = "pt")
                     # Passed press instance directly to pipeline (kv-press-text-generation)
-                    outputs = self.pipeline(
-                        final_prompt,
+                    gen_ids = self.model.generate(
+                        **inputs,
                         max_new_tokens=512,
                         do_sample=False,
                         top_p=1,
-                        return_full_text=False,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        press=self.kvpress_instance
+                        attention_compressor=self.kvpress_instance  # <- KVPress arg
                     )
+                    resp = self.tokenizer.decode(gen_ids[0], skip_special_tokens = True)
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
-                    outputs = None
+                    resp = None
 
             # If outputs is still None, run standard generation
-            if outputs is None:
+            if resp is None:
                 outputs = self.pipeline(
                     final_prompt,
                     max_new_tokens=512, 
@@ -349,6 +349,7 @@ class OfflineModel(BaseModel):
                     return_full_text=False,
                     pad_token_id=self.tokenizer.eos_token_id
                 )
+                resp = iutput[0].get('generated_text', '')
             
             # [CHANGE] Handle output format differences between standard pipeline and KVPress
             if isinstance(outputs, dict) and "answer" in outputs:
