@@ -324,6 +324,7 @@ class OfflineModel(BaseModel):
         try:
             # 2. Call Local Model
             outputs = None
+            resp = None
             
             # [FIX] Fallback Mechanism for KVPress
             if self.use_kvpress and self.kvpress_instance:
@@ -337,7 +338,7 @@ class OfflineModel(BaseModel):
                         do_sample=False,
                         top_p=1,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        attention_compressor=self.kvpress_instance  # <- KVPress arg
+                        press=self.kvpress_instance  # <- KVPress arg
                     )
                     resp = self.tokenizer.decode(gen_ids[0], skip_special_tokens = True)
                 except Exception as e:
