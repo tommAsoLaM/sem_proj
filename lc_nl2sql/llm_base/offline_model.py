@@ -43,7 +43,6 @@ class OfflineModel(BaseModel):
         self.model = None
         self.tokenizer = None
         self.pipeline = None
-        self.kvpress_pipeline = None  # KVPress-aware pipeline
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
@@ -93,15 +92,7 @@ class OfflineModel(BaseModel):
             
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
-            if KVPRESS_AVAILABLE:
-                print("Initializing KVPress wrapper")
-                # Ensure window_size is provided as required by FinchPress
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
-                
-                # IMPORTANT: Update model & tokenizer so KVPress can patch attention layers
-                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                
-                
+            
             self.pipeline = pipeline(
                 task_name,
                 model=self.model,
@@ -109,7 +100,7 @@ class OfflineModel(BaseModel):
                 torch_dtype=torch.float16,
                 device_map="auto"
             )
-            # KVPress pipeline gets (re)built in _initialize_kvpress
+
             self.kvpress_pipeline = None
             print("Model loaded successfully.")
         except Exception as e:
@@ -122,8 +113,9 @@ class OfflineModel(BaseModel):
     def _initialize_kvpress(self):
         """Initialize KVPress instance based on policy and compression ratio."""
         try:
+            windows_size = 32
             if self.kvpress_policy == "FinchPress":
-                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
+                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio, window_size = windows_size)
             elif self.kvpress_policy == "ExpectedAttentionPress":
                 self.kvpress_instance = ExpectedAttentionPress(compression_ratio=self.compression_ratio)
             else:
@@ -131,13 +123,12 @@ class OfflineModel(BaseModel):
                 self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
             
             self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-            # Build KVPress-aware pipeline as recommended by kvpress docs
             self.kvpress_pipeline = pipeline(
                 "kv-press-text-generation",
                 model=self.model,
                 tokenizer=self.tokenizer,
                 torch_dtype=torch.float16,
-                device_map="auto",
+                device_map="auto"
             )
             logging.info(f"KVPress initialized: {self.kvpress_policy} with compression_ratio={self.compression_ratio}")
         except Exception as e:
@@ -300,7 +291,7 @@ class OfflineModel(BaseModel):
 
     def _generate_sql(self,
                       query,
-                      temperature=0.5,
+                      temperature=0,
                       use_flash=False,
                       max_retries=5):
         """
@@ -339,26 +330,22 @@ class OfflineModel(BaseModel):
         try:
             # 2. Call Local Model
             outputs = None
-            resp = None
             
             # [FIX] Fallback Mechanism for KVPress
-            if self.use_kvpress and self.kvpress_instance and self.kvpress_pipeline:
+            if self.use_kvpress and self.kvpress_instance:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    outputs = self.kvpress_pipeline(
+                    inputs = self.tokenizer(final_prompt, return_tensors = "pt")
+                    # Passed press instance directly to pipeline (kv-press-text-generation)
+                    gen_ids = self.model.generate(
                         final_prompt,
                         max_new_tokens=512,
                         do_sample=False,
                         top_p=1,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        press=self.kvpress_instance,
+                        attention_compressor=self.kvpress_instance  # <- KVPress arg
                     )
-                    if isinstance(outputs, dict):
-                        resp = outputs.get("answer", "")
-                    elif isinstance(outputs, list) and len(outputs) > 0 and isinstance(outputs[0], dict):
-                        resp = outputs[0].get("answer", "")
-                    else:
-                        resp = None
+                    resp = self.tokenizer.decode(gen_ids[0], skip_special_tokens = True)
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     resp = None
@@ -371,17 +358,19 @@ class OfflineModel(BaseModel):
                     do_sample=False,
                     top_p=1,
                     return_full_text=False,
-                    pad_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.eos_token_id
                 )
-                if isinstance(outputs, list) and len(outputs) > 0:
-                    resp = outputs[0].get('generated_text', '')
-                elif isinstance(outputs, dict):
-                    resp = outputs.get('generated_text', '')
-                else:
-                    resp = str(outputs)
+                resp = outputs[0].get('generated_text', '')
             
             # [CHANGE] Handle output format differences between standard pipeline and KVPress
-            if resp is None:
+            if isinstance(outputs, dict) and "answer" in outputs:
+                # KVPress returns a dictionary with 'answer' key
+                resp = outputs["answer"]
+            elif isinstance(outputs, list) and len(outputs) > 0:
+                # Standard pipeline returns a list of dicts
+                resp = outputs[0].get('generated_text', '')
+            else:
+                # Fallback
                 logging.warning(f"Unexpected output format: {type(outputs)}")
                 resp = str(outputs)
             
