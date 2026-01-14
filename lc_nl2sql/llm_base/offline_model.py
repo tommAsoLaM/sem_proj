@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     # CHANGE: Import ChunkPress and KnormPress (needed as base for ChunkPress)
-    from kvpress import FinchPress,ExpectedAttentionPress
+    from kvpress import FinchPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -46,13 +46,10 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.kvpress_policy = "ExpectedAttentionPress"  # Default policy
-        self.compression_ratio = 0.4  # Default compression ratio
-        self.use_kvpress = True  # NEW: Enable/disable KVPress globally
         
         
         # Default config
-        self.temperature = 0
+        self.temperature = 0.5
         self.ignore_hints = False
         self.use_self_correction = True
         self.use_disambiguation = True
@@ -92,6 +89,17 @@ class OfflineModel(BaseModel):
             
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
+            if KVPRESS_AVAILABLE:
+                print("Initializing KVPress wrapper")
+                # Ensure window_size is provided as required by FinchPress
+                self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                
+                # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
+                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                
+                # Use the specific task name if available/registered by kvpress
+                task_name = "kv-press-text-generation"
+                
             
             self.pipeline = pipeline(
                 task_name,
@@ -100,36 +108,12 @@ class OfflineModel(BaseModel):
                 torch_dtype=torch.float16,
                 device_map="auto"
             )
-
-            self.kvpress_pipeline = None
             print("Model loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to load model: {e}")
             # Do not raise fatal error, set None to be handled in chat()
             self.model = None
             self.tokenizer = None
-
-
-    def _initialize_kvpress(self):
-        """Initialize KVPress instance based on policy and compression ratio."""
-        try:
-            if self.kvpress_policy == "ExpectedAttentionPress":
-                self.kvpress_instance = ExpectedAttentionPress(compression_ratio=self.compression_ratio)
-            
-            self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-            self.kvpress_pipeline = pipeline(
-                "kv-press-text-generation",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                torch_dtype=torch.float16,
-                device_map="auto"
-            )
-            logging.info(f"KVPress initialized: {self.kvpress_policy} with compression_ratio={self.compression_ratio}")
-        except Exception as e:
-            logging.error(f"Failed to initialize KVPress: {e}")
-            self.kvpress_instance = None
-            self.kvpress_pipeline = None
-    
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None):
         parser = HfArgumentParser((ModelArguments, DataArguments,
@@ -142,18 +126,12 @@ class OfflineModel(BaseModel):
             self.use_column_filtering_for_correction = args.get("use_column_filtering_for_correction", False)
             self.measure_self_correction_tokens = args.get("measure_self_correction_tokens", False)
             self.db_folder_path = args.get("db_folder_path", "")
-            self.temperature = args.get("temperature", 0.0)
+            self.temperature = args.get("temperature", 0.5)
             self.db_tbl_col_vals_file = args.get("db_tbl_col_vals_file", "db_tbl_col_vals_bird.pickle")
             self.ignore_hints = args.get("ignore_hints", False)
             
-            # Get KVPress arguments
+            # Get KVPress arguments from input args if present
             self.use_kvpress = args.get("use_kvpress", True)
-            self.kvpress_policy = args.get("kvpress_policy", "ExpectedAttentionPress")
-            self.compression_ratio = float(args.get("compression_ratio", 0.4))
-            
-            # Reinitialize KVPress if settings changed
-            if self.use_kvpress and KVPRESS_AVAILABLE:
-                self._initialize_kvpress()
         else:
             (
                 model_args,
@@ -173,15 +151,6 @@ class OfflineModel(BaseModel):
             
             #Default False if not in arguments
             self.use_kvpress = getattr(self.generating_args, "use_kvpress", True)
-            self.kvpress_policy = getattr(self.generating_args, "kvpress_policy", "ExpectedAttentionPress")
-            self.compression_ratio = float(getattr(self.generating_args, "compression_ratio", 0.4))
-            # Initialize KVPress NOW with command-line values
-            if self.use_kvpress and KVPRESS_AVAILABLE:
-                self._initialize_kvpress()
-                logging.info(f"KVPress enabled: {self.kvpress_policy}, compression_ratio={self.compression_ratio}")
-            else:
-                self.kvpress_instance = None
-                logging.info("KVPress disabled")
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
@@ -197,22 +166,6 @@ class OfflineModel(BaseModel):
 
     def set_temperature(self, temperature):
         self.temperature = temperature
-
-    def set_kvpress_config(self, use_kvpress: bool, policy: str = None, compression_ratio: float = None):
-        """Dynamically change KVPress configuration."""
-        self.use_kvpress = use_kvpress
-        
-        if policy is not None:
-            self.kvpress_policy = policy
-        if compression_ratio is not None:
-            self.compression_ratio = float(compression_ratio)
-        
-        if self.use_kvpress and KVPRESS_AVAILABLE:
-            self._initialize_kvpress()
-        else:
-            self.kvpress_instance = None
-            
-        logging.info(f"KVPress config updated: enabled={use_kvpress}, policy={self.kvpress_policy}, ratio={self.compression_ratio}")
         
     def _count_token(self, prompt):
         # ADAPTATION: Using local tokenizer
@@ -285,7 +238,7 @@ class OfflineModel(BaseModel):
 
     def _generate_sql(self,
                       query,
-                      temperature=0,
+                      temperature=0.5,
                       use_flash=False,
                       max_retries=5):
         """
@@ -324,29 +277,28 @@ class OfflineModel(BaseModel):
         try:
             # 2. Call Local Model
             outputs = None
-            resp = None
             
             # [FIX] Fallback Mechanism for KVPress
             if self.use_kvpress and self.kvpress_instance:
                 try:
                     logging.info(f"Generating with KVPress instance")
-                    inputs = self.tokenizer(final_prompt, return_tensors = "pt")
+                    
                     # Passed press instance directly to pipeline (kv-press-text-generation)
-                    gen_ids = self.model.generate(
+                    outputs = self.pipeline(
                         final_prompt,
                         max_new_tokens=512,
                         do_sample=False,
                         top_p=1,
+                        return_full_text=False,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        press=self.kvpress_instance  # <- KVPress arg
+                        press=self.kvpress_instance
                     )
-                    resp = self.tokenizer.decode(gen_ids[0], skip_special_tokens = True)
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
-                    resp = None
+                    outputs = None
 
             # If outputs is still None, run standard generation
-            if resp is None:
+            if outputs is None:
                 outputs = self.pipeline(
                     final_prompt,
                     max_new_tokens=512, 
@@ -355,7 +307,6 @@ class OfflineModel(BaseModel):
                     return_full_text=False,
                     pad_token_id=self.tokenizer.eos_token_id
                 )
-                resp = outputs[0].get('generated_text', '')
             
             # [CHANGE] Handle output format differences between standard pipeline and KVPress
             if isinstance(outputs, dict) and "answer" in outputs:
