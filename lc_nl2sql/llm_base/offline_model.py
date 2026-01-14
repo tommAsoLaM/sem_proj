@@ -93,7 +93,15 @@ class OfflineModel(BaseModel):
             
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
-            
+            if KVPRESS_AVAILABLE:
+                print("Initializing KVPress wrapper")
+                # Ensure window_size is provided as required by FinchPress
+                self.kvpress_instance = FinchPress(compression_ratio=0.4)
+                
+                # IMPORTANT: Update model & tokenizer so KVPress can patch attention layers
+                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                
+                
             self.pipeline = pipeline(
                 task_name,
                 model=self.model,
