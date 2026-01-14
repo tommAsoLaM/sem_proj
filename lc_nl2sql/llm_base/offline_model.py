@@ -46,7 +46,7 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.kvpress_policy = "FinchPress"  # Default policy
+        self.kvpress_policy = "ExpectedAttentionPress"  # Default policy
         self.compression_ratio = 0.4  # Default compression ratio
         self.use_kvpress = True  # NEW: Enable/disable KVPress globally
         
@@ -113,14 +113,8 @@ class OfflineModel(BaseModel):
     def _initialize_kvpress(self):
         """Initialize KVPress instance based on policy and compression ratio."""
         try:
-            windows_size = 32
-            if self.kvpress_policy == "FinchPress":
-                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio, window_size = windows_size)
-            elif self.kvpress_policy == "ExpectedAttentionPress":
+            if self.kvpress_policy == "ExpectedAttentionPress":
                 self.kvpress_instance = ExpectedAttentionPress(compression_ratio=self.compression_ratio)
-            else:
-                logging.warning(f"Unknown KVPress policy: {self.kvpress_policy}. Using FinchPress.")
-                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
             
             self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
             self.kvpress_pipeline = pipeline(
@@ -154,7 +148,7 @@ class OfflineModel(BaseModel):
             
             # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
-            self.kvpress_policy = args.get("kvpress_policy", "FinchPress")
+            self.kvpress_policy = args.get("kvpress_policy", "ExpectedAttentionPress")
             self.compression_ratio = float(args.get("compression_ratio", 0.4))
             
             # Reinitialize KVPress if settings changed
@@ -179,7 +173,7 @@ class OfflineModel(BaseModel):
             
             #Default False if not in arguments
             self.use_kvpress = getattr(self.generating_args, "use_kvpress", True)
-            self.kvpress_policy = getattr(self.generating_args, "kvpress_policy", "FinchPress")
+            self.kvpress_policy = getattr(self.generating_args, "kvpress_policy", "ExpectedAttentionPress")
             self.compression_ratio = float(getattr(self.generating_args, "compression_ratio", 0.4))
             # Initialize KVPress NOW with command-line values
             if self.use_kvpress and KVPRESS_AVAILABLE:
