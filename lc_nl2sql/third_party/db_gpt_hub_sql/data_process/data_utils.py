@@ -64,12 +64,12 @@ def extract_sql_prompt_dataset(example: Dict[str, Any]) -> Dict[str, str]:
     if "instruction" in example and "input" in example:
         return {"input": example["instruction"] + example["input"]}
     
-    # Otherwise apply format template (for backward compatibility)
-    if example.get("input", "") != "":
-        prompt_format = SQL_PROMPT_DICT["prompt_no_prefix"]
-    else:
-        prompt_format = SQL_PROMPT_DICT["prompt_no_input"]
-    return {"input": prompt_format.format(**example)}
+    # If data has 'input' only (already formatted), return as-is
+    if "input" in example:
+        return {"input": example["input"]}
+    
+    # If neither exists, just wrap the entire example (raw data will be processed elsewhere)
+    return example
 
 
 def load_data(
