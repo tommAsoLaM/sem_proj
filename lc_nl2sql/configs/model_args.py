@@ -209,6 +209,12 @@ class GeneratingArguments:
             "help": "Number of beams for beam search. 1 means no beam search."
         },
     )
+    use_beams: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": "Whether to use beam search (0=disabled, 1=enabled)"
+        },
+    )
     max_length: Optional[int] = field(
         default=None,
         metadata={
