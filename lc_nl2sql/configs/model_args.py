@@ -172,17 +172,21 @@ class GeneratingArguments:
         },
     )
     temperature: Optional[float] = field(
-        default=0.5,
+        default=0.0,
         metadata={
             "help": "The value used to modulate the next token probabilities."
         },
     )
     top_p: Optional[float] = field(
-        default=0.7,
+        default=1,
         metadata={
             "help":
             "The smallest set of most probable tokens with probabilities that add up to top_p or higher are kept."
         },
+    )
+    use_kvpress: int = field(
+        default=True,
+        metadata={"help": "Whether to use KVPress (0=disabled, 1=enabled)"}
     )
     top_k: Optional[int] = field(
         default=50,
@@ -190,6 +194,14 @@ class GeneratingArguments:
             "help":
             "The number of highest probability vocabulary tokens to keep for top-k filtering."
         },
+    )
+    kvpress_policy: str = field(
+        default="FinchPress",
+        metadata={"help": "KVPress policy: FinchPress or ExpectedAttentionPress"}
+    )
+    compression_ratio: float = field(
+        default=0.4,
+        metadata={"help": "KVPress compression ratio (0.2, 0.4, 0.6, 0.8)"}
     )
     num_beams: Optional[int] = field(
         default=1,

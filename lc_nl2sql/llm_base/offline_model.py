@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     # CHANGE: Import ChunkPress and KnormPress (needed as base for ChunkPress)
-    from kvpress import FinchPress
+    from kvpress import FinchPress,ExpectedAttentionPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -46,10 +46,13 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
+        self.kvpress_policy = "FinchPress"  # Default policy
+        self.compression_ratio = 0.4  # Default compression ratio
+        self.use_kvpress = True  # NEW: Enable/disable KVPress globally
         
         
         # Default config
-        self.temperature = 0.5
+        self.temperature = 0
         self.ignore_hints = False
         self.use_self_correction = True
         self.use_disambiguation = True
@@ -89,17 +92,6 @@ class OfflineModel(BaseModel):
             
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
-            if KVPRESS_AVAILABLE:
-                print("Initializing KVPress wrapper")
-                # Ensure window_size is provided as required by FinchPress
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
-                
-                # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
-                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                
-                # Use the specific task name if available/registered by kvpress
-                task_name = "kv-press-text-generation"
-                
             
             self.pipeline = pipeline(
                 task_name,
@@ -115,6 +107,25 @@ class OfflineModel(BaseModel):
             self.model = None
             self.tokenizer = None
 
+
+    def _initialize_kvpress(self):
+        """Initialize KVPress instance based on policy and compression ratio."""
+        try:
+            if self.kvpress_policy == "FinchPress":
+                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
+            elif self.kvpress_policy == "ExpectedAttentionPress":
+                self.kvpress_instance = ExpectedAttentionPress(compression_ratio=self.compression_ratio)
+            else:
+                logging.warning(f"Unknown KVPress policy: {self.kvpress_policy}. Using FinchPress.")
+                self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
+            
+            self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+            logging.info(f"KVPress initialized: {self.kvpress_policy} with compression_ratio={self.compression_ratio}")
+        except Exception as e:
+            logging.error(f"Failed to initialize KVPress: {e}")
+            self.kvpress_instance = None
+    
+
     def _infer_args(self, args: Optional[Dict[str, Any]] = None):
         parser = HfArgumentParser((ModelArguments, DataArguments,
                                    FinetuningArguments, GeneratingArguments))
@@ -126,12 +137,18 @@ class OfflineModel(BaseModel):
             self.use_column_filtering_for_correction = args.get("use_column_filtering_for_correction", False)
             self.measure_self_correction_tokens = args.get("measure_self_correction_tokens", False)
             self.db_folder_path = args.get("db_folder_path", "")
-            self.temperature = args.get("temperature", 0.5)
+            self.temperature = args.get("temperature", 0.0)
             self.db_tbl_col_vals_file = args.get("db_tbl_col_vals_file", "db_tbl_col_vals_bird.pickle")
             self.ignore_hints = args.get("ignore_hints", False)
             
-            # Get KVPress arguments from input args if present
+            # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
+            self.kvpress_policy = args.get("kvpress_policy", "FinchPress")
+            self.compression_ratio = float(args.get("compression_ratio", 0.4))
+            
+            # Reinitialize KVPress if settings changed
+            if self.use_kvpress and KVPRESS_AVAILABLE:
+                self._initialize_kvpress()
         else:
             (
                 model_args,
@@ -151,6 +168,15 @@ class OfflineModel(BaseModel):
             
             #Default False if not in arguments
             self.use_kvpress = getattr(self.generating_args, "use_kvpress", True)
+            self.kvpress_policy = getattr(self.generating_args, "kvpress_policy", "FinchPress")
+            self.compression_ratio = float(getattr(self.generating_args, "compression_ratio", 0.4))
+            # Initialize KVPress NOW with command-line values
+            if self.use_kvpress and KVPRESS_AVAILABLE:
+                self._initialize_kvpress()
+                logging.info(f"KVPress enabled: {self.kvpress_policy}, compression_ratio={self.compression_ratio}")
+            else:
+                self.kvpress_instance = None
+                logging.info("KVPress disabled")
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
@@ -166,6 +192,22 @@ class OfflineModel(BaseModel):
 
     def set_temperature(self, temperature):
         self.temperature = temperature
+
+    def set_kvpress_config(self, use_kvpress: bool, policy: str = None, compression_ratio: float = None):
+        """Dynamically change KVPress configuration."""
+        self.use_kvpress = use_kvpress
+        
+        if policy is not None:
+            self.kvpress_policy = policy
+        if compression_ratio is not None:
+            self.compression_ratio = float(compression_ratio)
+        
+        if self.use_kvpress and KVPRESS_AVAILABLE:
+            self._initialize_kvpress()
+        else:
+            self.kvpress_instance = None
+            
+        logging.info(f"KVPress config updated: enabled={use_kvpress}, policy={self.kvpress_policy}, ratio={self.compression_ratio}")
         
     def _count_token(self, prompt):
         # ADAPTATION: Using local tokenizer
