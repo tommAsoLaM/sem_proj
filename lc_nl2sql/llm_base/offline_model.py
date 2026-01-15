@@ -149,7 +149,10 @@ class OfflineModel(BaseModel):
             self.use_kvpress = self.generating_args.use_kvpress
             self.kvpress_policy = self.generating_args.kvpress
             self.compression_ratio = self.generating_args.compression_ratio
+            self._settingKVPress()
             logging.info(f"Using KVPress compression: {self.kvpress_policy} with compression ratio: {self.compression_ratio}")
+                
+        def _settingKVPress(self):
             if self.kvpress_policy == "FinchPress":
                 logging.info(f"Initializing KVPress wrapper: FinchPress")
                     # Ensure window_size is provided as required by FinchPress
@@ -161,8 +164,11 @@ class OfflineModel(BaseModel):
             elif self.kvpress_policy == "ExpectedAttentionPress":
                 self.kvpress_instance = ExpectedAttentionPress(compression_ratio = self.compression_ratio)
                 logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
-                
-        
+            else:
+                logging.info(f"Running without KVPress")
+            
+
+
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
         
@@ -323,8 +329,7 @@ class OfflineModel(BaseModel):
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     outputs = None
-            else:
-                logging.info(f"running without kvpress")
+                
 
             # If outputs is still None, run standard generation
             if outputs is None:
