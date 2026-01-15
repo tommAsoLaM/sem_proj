@@ -46,10 +46,13 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
+        self.kvpress_policy = "FinchPress"  # Default policy
+        self.compression_ratio = 0.4  # Default compression ratio
+        self.use_kvpress = True  # NEW: Enable/disable KVPress globally
         
         
         # Default config
-        self.temperature = 0.5
+        self.temperature = 0
         self.ignore_hints = False
         self.use_self_correction = True
         self.use_disambiguation = True
@@ -126,11 +129,11 @@ class OfflineModel(BaseModel):
             self.use_column_filtering_for_correction = args.get("use_column_filtering_for_correction", False)
             self.measure_self_correction_tokens = args.get("measure_self_correction_tokens", False)
             self.db_folder_path = args.get("db_folder_path", "")
-            self.temperature = args.get("temperature", 0.5)
+            self.temperature = args.get("temperature", 0.0)
             self.db_tbl_col_vals_file = args.get("db_tbl_col_vals_file", "db_tbl_col_vals_bird.pickle")
             self.ignore_hints = args.get("ignore_hints", False)
             
-            # Get KVPress arguments from input args if present
+            # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
         else:
             (
