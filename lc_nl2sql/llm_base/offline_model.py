@@ -99,6 +99,7 @@ class OfflineModel(BaseModel):
                 
                 # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
                 self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                delimiter = self.kvpress_instance.delimiter_token
                 
                 # Use the specific task name if available/registered by kvpress
                 task_name = "kv-press-text-generation"
@@ -151,9 +152,6 @@ class OfflineModel(BaseModel):
             self.db_folder_path = self.data_args.db_folder_path
             self.db_tbl_col_vals_file = self.data_args.db_tbl_col_vals_file
             self.ignore_hints = self.generating_args.ignore_hints
-            
-            #Default False if not in arguments
-            self.use_kvpress = getattr(self.generating_args, "use_kvpress", True)
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
@@ -161,11 +159,6 @@ class OfflineModel(BaseModel):
         # Ensure model is loaded (double check)
         if self.model is None:
             self.load_model()
-
-    # Helper to dynamically change KVPress policy
-    def set_kvpress_policy(self, policy):
-        """Sets self_attn_func (policy) for KVPress"""
-        self.kvpress_policy = policy
 
     def set_temperature(self, temperature):
         self.temperature = temperature
@@ -257,7 +250,22 @@ class OfflineModel(BaseModel):
         # Apply Llama-3 Chat Template here
         # We wrap the cleaned query into a User message format
         try:
-            messages = [{"role": "user", "content": query}]
+            # Extract schema/context if KVPress is enabled
+            if self.use_kvpress and self.kvpress_instance:
+                delimiter = self.kvpress_instance.delimiter_token
+                # Split query into context and actual query (assuming "###Question###" marks the boundary)
+                if "###Question###" in query:
+                    context_part = query[:query.find("###Question###")]
+                    query_part = query[query.find("###Question###"):]
+                    # Insert delimiter between context and query
+                    query_with_delimiter = context_part + "\n" + delimiter + "\n" + query_part
+                else:
+                    # Fallback if no clear boundary
+                    query_with_delimiter = query
+            else:
+                query_with_delimiter = query
+            
+            messages = [{"role": "user", "content": query_with_delimiter}]
             
             # tokenize=False so that output remains string (but with <|user|> tags etc)
             # add_generation_prompt=True so the model knows it's its turn to answer (<|assistant|>)
@@ -291,8 +299,8 @@ class OfflineModel(BaseModel):
                         final_prompt,
                         max_new_tokens=512,
                         do_sample=True if temperature > 0 else False,
-                        temperature=temperature if temperature > 0 else 1.0,
-                        top_p=0.9,
+                        temperature=0,
+                        top_p=1,
                         return_full_text=False,
                         pad_token_id=self.tokenizer.eos_token_id,
                         press=self.kvpress_instance
