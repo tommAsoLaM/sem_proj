@@ -43,7 +43,7 @@ class ModelArguments:
     use_auth_token: Optional[bool] = field(
         default=False,
         metadata={
-            "help": "Will use the token generated when running `huggingface-cli login`."
+            "help": "Will use the token generated when running ⁠ huggingface-cli login ⁠."
         },
     )
     model_revision: Optional[str] = field(
@@ -107,7 +107,7 @@ class ModelArguments:
         },
     )
 
-    def __post_init__(self):
+    def _post_init_(self):
 
         if self.checkpoint_dir is not None:  # support merging multiple lora weights
             self.checkpoint_dir = [cd.strip() for cd in self.checkpoint_dir.split(",")]
@@ -172,21 +172,17 @@ class GeneratingArguments:
         },
     )
     temperature: Optional[float] = field(
-        default=0.0,
+        default=0.5,
         metadata={
             "help": "The value used to modulate the next token probabilities."
         },
     )
     top_p: Optional[float] = field(
-        default=1,
+        default=0.7,
         metadata={
             "help":
             "The smallest set of most probable tokens with probabilities that add up to top_p or higher are kept."
         },
-    )
-    use_kvpress: int = field(
-        default=True,
-        metadata={"help": "Whether to use KVPress (0=disabled, 1=enabled)"}
     )
     top_k: Optional[int] = field(
         default=50,
@@ -195,24 +191,10 @@ class GeneratingArguments:
             "The number of highest probability vocabulary tokens to keep for top-k filtering."
         },
     )
-    kvpress_policy: str = field(
-        default="FinchPress",
-        metadata={"help": "KVPress policy: FinchPress or ExpectedAttentionPress"}
-    )
-    compression_ratio: float = field(
-        default=0.4,
-        metadata={"help": "KVPress compression ratio (0.2, 0.4, 0.6, 0.8)"}
-    )
     num_beams: Optional[int] = field(
         default=1,
         metadata={
             "help": "Number of beams for beam search. 1 means no beam search."
-        },
-    )
-    use_beams: Optional[int] = field(
-        default=1,
-        metadata={
-            "help": "Whether to use beam search (0=disabled, 1=enabled)"
         },
     )
     max_length: Optional[int] = field(
@@ -344,7 +326,7 @@ class FinetuningArguments:
         metadata={"help": "The name of the finetuning technique."}
     )
 
-    def __post_init__(self):
+    def _post_init_(self):
         if isinstance(
             self.lora_target, str
         ):  # support custom target modules/layers of LoRA
@@ -374,15 +356,14 @@ class FinetuningArguments:
         ], "Invalid fine-tuning method."
 
     def save_to_json(self, json_path: str):
-        r"""Saves the content of this instance in JSON format inside `json_path`."""
+        r"""Saves the content of this instance in JSON format inside ⁠ json_path ⁠."""
         json_string = json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
         with open(json_path, "w", encoding="utf-8") as f:
             f.write(json_string)
 
     @classmethod
     def load_from_json(cls, json_path: str):
-        r"""Creates an instance from the content of `json_path`."""
+        r"""Creates an instance from the content of ⁠ json_path ⁠."""
         with open(json_path, "r", encoding="utf-8") as f:
             text = f.read()
         return cls(**json.loads(text))
-

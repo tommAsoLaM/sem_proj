@@ -192,10 +192,6 @@ class DataArguments:
         default="lc_nl2sql/data/example_text2sql_dev.json",
         metadata={"help": "Predict input filename to do pred"},
     )
-    input_table_path: Optional[str] = field(
-        default="",
-        metadata={"help": "Path to the input table file"},
-    )
     predicted_out_filename: Optional[str] = field(
         default="",
         metadata={"help": "Filename to save predicted outcomes"},
