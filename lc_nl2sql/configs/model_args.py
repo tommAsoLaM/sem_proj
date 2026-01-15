@@ -164,6 +164,19 @@ class GeneratingArguments:
             "Whether or not to measure and record additional tokens used for self-correction loop."
         },
     )
+    
+    use_kvpress: bool = field(
+        default=True,
+        metadata={"help": "Enable KVPress acceleration/compression."}
+    )
+    kvpress: Optional[str] = field(
+        default=None,
+        metadata={"help": "KVPress policy: FinchPress or ExpectedAttentionPress."}
+    )
+    compression_ratio: float = field(
+        default=0.4,
+        metadata={"help": "KVPress compression ratio (0-1)."}
+    )
     use_flash: Optional[bool] = field(
         default=False,
         metadata={

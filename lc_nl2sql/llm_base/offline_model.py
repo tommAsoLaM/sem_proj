@@ -46,7 +46,9 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
+        self.kvpress_policy = None
         self.use_kvpress = True  # NEW: Enable/disable KVPress globally
+        self.compression_ratio = 0.4
         
         
         # Default config
@@ -155,7 +157,10 @@ class OfflineModel(BaseModel):
             self.measure_self_correction_tokens = self.generating_args.measure_self_correction_tokens
             self.db_folder_path = self.data_args.db_folder_path
             self.db_tbl_col_vals_file = self.data_args.db_tbl_col_vals_file
-            self.ignore_hints = self.generating_args.ignore_hints
+            self.ignore_hints = self.generating_args.ignore_hints            
+            self.use_kvpress = self.generating_args.use_kvpress
+            self.kvpress_policy = self.generating_args.kvpress
+            self.compression_ratio = self.generating_args.compression_ratio
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
