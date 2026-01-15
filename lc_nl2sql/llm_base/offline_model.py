@@ -141,6 +141,7 @@ class OfflineModel(BaseModel):
             # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
             self.kvpress_policy = args.get("kvpress", None)
+            logging.info("we are usig compression:", {self.kvpress_policy})
             self.compression_ratio = args.get("compression_ratio", 0.4)
         else:
             (
