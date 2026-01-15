@@ -93,9 +93,9 @@ class OfflineModel(BaseModel):
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
-                logging.info(f"Initializing KVPress wrapper: {self.kvpress_policy}")
+                
                 if self.kvpress_policy == "FinchPress":
-                    
+                    logging.info(f"Initializing KVPress wrapper: FinchPress")
                     # Ensure window_size is provided as required by FinchPress
                     self.kvpress_instance = FinchPress(self.compression_ratio)
                     
@@ -104,9 +104,11 @@ class OfflineModel(BaseModel):
                     delimiter = self.kvpress_instance.delimiter_token
                 elif self.kvpress_policy == "ExpectedAttentionPress":
                     self.kvpress_instance = ExpectedAttentionPress(self.compression_ratio)
+                    logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
                     
                     # Use the specific task name if available/registered by kvpress
                 task_name = "kv-press-text-generation"
+                logging.info(f"No KVPress")
                 
             
             self.pipeline = pipeline(
