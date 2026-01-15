@@ -89,7 +89,7 @@ AICompilation_r0.1
 #SBATCH --error=error-%j.txt
 
 # ----------------------------------------------------
-# KONFIGURASI PATH & VARIABEL
+# VARIABLE AND PATH SETTINGS
 # ----------------------------------------------------
 
 AICompilation_r0.1
@@ -100,12 +100,12 @@ DB_PATH="${BASE_INPUT_DIR}/dev_databases"
 INPUT_DATA="${BASE_INPUT_DIR}/dev_trim.json"
 INPUT_TABLES="${BASE_INPUT_DIR}/dev_tables.json"
 
-# 2. Intermediate Directory (Tempat simpan hasil process data json)
-# Sesuaikan nama folder ablation di sini (misal: ablation_2 atau ablation_finch)
+# 2. Intermediate Directory (Place to store processed JSON data)
+# Adjust the ablation folder name here (e.g., ablation_2 or ablation_finch)
 PROCESSED_DIR="${BASE_INPUT_DIR}/ablation"
 
 # 3. Output Directories
-# Sesuaikan nama folder output utama di sini
+# Adjust the main output folder name here
 OUT_DIR="lc_nl2sql/output/pred/ablation"
 TOKEN_DIR="${OUT_DIR}/token_count"
 
@@ -114,7 +114,7 @@ POLICIES=("FinchPress" "ExpectedAttentionPress")
 RATIOS=(0.2 0.4 0.6 0.8)
 
 # ----------------------------------------------------
-# SETUP Awal
+# INITIAL SETUP
 # ----------------------------------------------------
 
 echo "========================================================"
@@ -128,7 +128,7 @@ echo "Policies     : ${POLICIES[*]}"
 echo "Ratios       : ${RATIOS[*]}"
 echo "========================================================"
 
-# Membuat folder output jika belum ada (mencegah error FileNotFoundError)
+# Create output directories if they don't exist (prevent FileNotFoundError)
 mkdir -p "${PROCESSED_DIR}"
 mkdir -p "${TOKEN_DIR}"
 
@@ -316,7 +316,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 # ==============================================================================
 echo "---------------------------------------"
 echo "Ablation 4. + self correction"
-# (Menggunakan PROC_FILE_3 dari step sebelumnya)
+# (Use PROC_FILE_3 from the previous step)
 
 # [PREDICT LOOP - STEP 4]
 for POLICY in "${POLICIES[@]}"; do
@@ -361,7 +361,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 # ==============================================================================
 echo "---------------------------------------"
 echo "Ablation 5. + disambiguation"
-# (Masih menggunakan PROC_FILE_3)
+# (Still using PROC_FILE_3 from the previous step)
 
 # [PREDICT LOOP - STEP 5]
 for POLICY in "${POLICIES[@]}"; do
@@ -465,7 +465,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 # ==============================================================================
 echo "---------------------------------------"
 echo "Ablation 7. + verify & retry"
-# (Menggunakan PROC_FILE_6)
+# (Using PROC_FILE_6 from the previous step)
 
 # [PREDICT LOOP - STEP 7]
 for POLICY in "${POLICIES[@]}"; do
@@ -518,7 +518,7 @@ poetry run python lc_nl2sql/predict/count_verify_token.py \
 # ==============================================================================
 echo "---------------------------------------"
 echo "Ablation for without hints"
-# (Menggunakan PROC_FILE_6, ignore hints)
+# (Using PROC_FILE_6 from the previous step, ignore hints)
 
 # [PREDICT LOOP - NO HINTS]
 for POLICY in "${POLICIES[@]}"; do
