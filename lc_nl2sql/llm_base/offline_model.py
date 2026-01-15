@@ -93,7 +93,7 @@ class OfflineModel(BaseModel):
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
-                
+                task_name = "kv-press-text-generation"
                 if self.kvpress_policy == "FinchPress":
                     logging.info(f"Initializing KVPress wrapper: FinchPress")
                     # Ensure window_size is provided as required by FinchPress
@@ -105,10 +105,6 @@ class OfflineModel(BaseModel):
                 elif self.kvpress_policy == "ExpectedAttentionPress":
                     self.kvpress_instance = ExpectedAttentionPress(self.compression_ratio)
                     logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
-                    
-                    # Use the specific task name if available/registered by kvpress
-                task_name = "kv-press-text-generation"
-                logging.info(f"No KVPress")
                 
             
             self.pipeline = pipeline(
@@ -143,8 +139,8 @@ class OfflineModel(BaseModel):
             # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
             self.kvpress_policy = args.get("kvpress", None)
-            logging.info("we are usig compression:", {self.kvpress_policy})
             self.compression_ratio = args.get("compression_ratio", 0.4)
+            logging.info(f"Using KVPress compression: {self.kvpress_policy} with compression ratio: {self.compression_ratio}")
         else:
             (
                 model_args,
@@ -164,6 +160,7 @@ class OfflineModel(BaseModel):
             self.use_kvpress = self.generating_args.use_kvpress
             self.kvpress_policy = self.generating_args.kvpress
             self.compression_ratio = self.generating_args.compression_ratio
+            logging.info(f"Using KVPress compression: {self.kvpress_policy} with compression ratio: {self.compression_ratio}")
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
