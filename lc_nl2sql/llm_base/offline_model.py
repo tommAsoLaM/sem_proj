@@ -27,7 +27,7 @@ except ImportError:
 # Ensure kvpress library is installed or in path
 try:
     # CHANGE: Import ChunkPress and KnormPress (needed as base for ChunkPress)
-    from kvpress import FinchPress
+    from kvpress import FinchPress, ExpectedAttentionPress
     KVPRESS_AVAILABLE = True
 except ImportError:
     KVPRESS_AVAILABLE = False
@@ -46,8 +46,6 @@ class OfflineModel(BaseModel):
         
         # [NEW] Variables for KVPress
         self.kvpress_instance = None
-        self.kvpress_policy = "FinchPress"  # Default policy
-        self.compression_ratio = 0.4  # Default compression ratio
         self.use_kvpress = True  # NEW: Enable/disable KVPress globally
         
         
@@ -93,15 +91,19 @@ class OfflineModel(BaseModel):
             # Initialize KVPress Wrapper on Model
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
-                print("Initializing KVPress wrapper")
-                # Ensure window_size is provided as required by FinchPress
-                self.kvpress_instance = FinchPress(compression_ratio=0.4)
-                
-                # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
-                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                delimiter = self.kvpress_instance.delimiter_token
-                
-                # Use the specific task name if available/registered by kvpress
+                logging.info(f"Initializing KVPress wrapper: {self.kvpress_policy}")
+                if self.kvpress_policy == "FinchPress":
+                    
+                    # Ensure window_size is provided as required by FinchPress
+                    self.kvpress_instance = FinchPress(self.compression_ratio)
+                    
+                    # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
+                    self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                    delimiter = self.kvpress_instance.delimiter_token
+                elif self.kvpress_policy == "ExpectedAttentionPress":
+                    self.kvpress_instance = ExpectedAttentionPress(self.compression_ratio)
+                    
+                    # Use the specific task name if available/registered by kvpress
                 task_name = "kv-press-text-generation"
                 
             
@@ -136,6 +138,8 @@ class OfflineModel(BaseModel):
             
             # Get KVPress arguments
             self.use_kvpress = args.get("use_kvpress", True)
+            self.kvpress_policy = args.get("kvpress", None)
+            self.compression_ratio = args.get("compression_ratio", 0.4)
         else:
             (
                 model_args,
@@ -160,7 +164,7 @@ class OfflineModel(BaseModel):
         if self.model is None:
             self.load_model()
 
-    def set_temperature(self, temperature):
+    def set_temperature(self, temperature = 0):
         self.temperature = temperature
         
     def _count_token(self, prompt):
@@ -251,7 +255,8 @@ class OfflineModel(BaseModel):
         # We wrap the cleaned query into a User message format
         try:
             # Extract schema/context if KVPress is enabled
-            if self.use_kvpress and self.kvpress_instance:
+            if self.use_kvpress and self.kvpress_instance and self.kvpress_policy == "FinchPress":
+                # Only FinchPress uses delimiter token
                 delimiter = self.kvpress_instance.delimiter_token
                 # Split query into context and actual query (assuming "###Question###" marks the boundary)
                 if "###Question###" in query:
@@ -262,7 +267,11 @@ class OfflineModel(BaseModel):
                 else:
                     # Fallback if no clear boundary
                     query_with_delimiter = query
+            elif self.use_kvpress and self.kvpress_instance and self.kvpress_policy == "ExpectedAttentionPress":
+                # ExpectedAttentionPress doesn't need delimiter - use query as-is
+                query_with_delimiter = query
             else:
+                # No KVPress enabled or no policy set
                 query_with_delimiter = query
             
             messages = [{"role": "user", "content": query_with_delimiter}]
@@ -315,8 +324,8 @@ class OfflineModel(BaseModel):
                     final_prompt,
                     max_new_tokens=512, 
                     do_sample=True if temperature > 0 else False,
-                    temperature=temperature if temperature > 0 else 1.0,
-                    top_p=0.9,
+                    temperature=1.0,
+                    top_p=1.0,
                     return_full_text=False,
                     pad_token_id=self.tokenizer.eos_token_id
                 )
