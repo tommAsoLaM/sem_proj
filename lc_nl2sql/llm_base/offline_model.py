@@ -323,6 +323,8 @@ class OfflineModel(BaseModel):
                 except Exception as e:
                     logging.warning(f"KVPress generation failed: {e}. Falling back to standard generation.")
                     outputs = None
+            else:
+                logging.info(f"running without kvpress")
 
             # If outputs is still None, run standard generation
             if outputs is None:
