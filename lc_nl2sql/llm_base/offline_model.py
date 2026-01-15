@@ -152,20 +152,27 @@ class OfflineModel(BaseModel):
             self._settingKVPress()
             logging.info(f"Using KVPress compression: {self.kvpress_policy} with compression ratio: {self.compression_ratio}")
                 
-        def _settingKVPress(self):
-            if self.kvpress_policy == "FinchPress":
-                logging.info(f"Initializing KVPress wrapper: FinchPress")
-                    # Ensure window_size is provided as required by FinchPress
-                self.kvpress_instance = FinchPress(compression_ratio = self.compression_ratio)
-                    
-                    # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
-                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                delimiter = self.kvpress_instance.delimiter_token
-            elif self.kvpress_policy == "ExpectedAttentionPress":
-                self.kvpress_instance = ExpectedAttentionPress(compression_ratio = self.compression_ratio)
-                logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
-            else:
-                logging.info(f"Running without KVPress")
+    def _settingKVPress(self):
+
+        # 2. Safety Check: Ensure model/tokenizer exist before modifying them
+        if self.model is None or self.tokenizer is None:
+            logging.warning("Cannot initialize KVPress: Model or Tokenizer is None.")
+            return
+
+        if self.kvpress_policy == "FinchPress":
+            logging.info(f"Initializing KVPress wrapper: FinchPress")
+            self.kvpress_instance = FinchPress(compression_ratio=self.compression_ratio)
+            
+            # This modifies the tokenizer in-place, which is permanent for this runtime
+            self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+            
+        elif self.kvpress_policy == "ExpectedAttentionPress":
+            logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
+            self.kvpress_instance = ExpectedAttentionPress(compression_ratio=self.compression_ratio)
+            
+        else:
+            logging.info(f"Running without KVPress")
+            self.kvpress_instance = None  
             
 
 
