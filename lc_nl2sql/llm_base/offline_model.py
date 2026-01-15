@@ -94,17 +94,6 @@ class OfflineModel(BaseModel):
             task_name = "text-generation"
             if KVPRESS_AVAILABLE:
                 task_name = "kv-press-text-generation"
-                if self.kvpress_policy == "FinchPress":
-                    logging.info(f"Initializing KVPress wrapper: FinchPress")
-                    # Ensure window_size is provided as required by FinchPress
-                    self.kvpress_instance = FinchPress(self.compression_ratio)
-                    
-                    # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
-                    self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
-                    delimiter = self.kvpress_instance.delimiter_token
-                elif self.kvpress_policy == "ExpectedAttentionPress":
-                    self.kvpress_instance = ExpectedAttentionPress(self.compression_ratio)
-                    logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
                 
             
             self.pipeline = pipeline(
@@ -161,6 +150,18 @@ class OfflineModel(BaseModel):
             self.kvpress_policy = self.generating_args.kvpress
             self.compression_ratio = self.generating_args.compression_ratio
             logging.info(f"Using KVPress compression: {self.kvpress_policy} with compression ratio: {self.compression_ratio}")
+            if self.kvpress_policy == "FinchPress":
+                logging.info(f"Initializing KVPress wrapper: FinchPress")
+                    # Ensure window_size is provided as required by FinchPress
+                self.kvpress_instance = FinchPress(compression_ratio = self.compression_ratio)
+                    
+                    # PENTING: Update model & tokenizer agar kenal token delimiter KVPress
+                self.kvpress_instance.update_model_and_tokenizer(self.model, self.tokenizer)
+                delimiter = self.kvpress_instance.delimiter_token
+            elif self.kvpress_policy == "ExpectedAttentionPress":
+                self.kvpress_instance = ExpectedAttentionPress(compression_ratio = self.compression_ratio)
+                logging.info(f"Initializing KVPress wrapper: ExpectedAttentionPress")
+                
         
         if self.ignore_hints:
             logging.info("*** ignoring hints ***")
