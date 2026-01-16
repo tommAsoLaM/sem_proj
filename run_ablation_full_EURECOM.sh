@@ -36,6 +36,7 @@ echo "Ratios       : ${RATIOS[*]}"
 echo "========================================================"
 
 # Create output directories if they don't exist (prevent FileNotFoundError)
+mkdir -p "${BASE_INPUT_DIR}"
 mkdir -p "${PROCESSED_DIR}"
 mkdir -p "${OUT_DIR}"
 mkdir -p "${TOKEN_DIR}"
