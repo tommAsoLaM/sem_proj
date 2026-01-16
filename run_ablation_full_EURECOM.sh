@@ -97,7 +97,7 @@ AICompilation_r0.1
 # 1. Input Directories
 BASE_INPUT_DIR="lc_nl2sql/data/bird/dev"
 DB_PATH="${BASE_INPUT_DIR}/dev_databases"
-INPUT_DATA="${BASE_INPUT_DIR}/dev_trim.json"
+INPUT_DATA="${BASE_INPUT_DIR}/dev.json"
 INPUT_TABLES="${BASE_INPUT_DIR}/dev_tables.json"
 
 # 2. Intermediate Directory (Place to store processed JSON data)
@@ -130,6 +130,7 @@ echo "========================================================"
 
 # Create output directories if they don't exist (prevent FileNotFoundError)
 mkdir -p "${PROCESSED_DIR}"
+mkdir -p "${OUT_DIR}"
 mkdir -p "${TOKEN_DIR}"
 
 # ----------------------------------------------------
@@ -140,7 +141,7 @@ mkdir -p "${TOKEN_DIR}"
 echo "---------------------------------------"
 echo "Ablation 1. Use all tables from DB"
 
-PROC_FILE_1="${PROCESSED_DIR}/dev_trim_processed_ablation_1.json"
+PROC_FILE_1="${PROCESSED_DIR}/dev_processed_ablation_1.json"
 
 # [PROCESS DATA - STEP 1]
 poetry run python lc_nl2sql/data_process/sql_data_process.py \
@@ -199,7 +200,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 echo "---------------------------------------"
 echo "Ablation 2. + hint"
 
-PROC_FILE_2="${PROCESSED_DIR}/dev_trim_processed_ablation_2.json"
+PROC_FILE_2="${PROCESSED_DIR}/dev_processed_ablation_2.json"
 
 # [PROCESS DATA - STEP 2]
 poetry run python lc_nl2sql/data_process/sql_data_process.py \
@@ -258,7 +259,7 @@ poetry run python lc_nl2sql/predict/count_token.py \
 echo "---------------------------------------"
 echo "Ablation 3. + distinct column values"
 
-PROC_FILE_3="${PROCESSED_DIR}/dev_trim_processed_ablation_3.json"
+PROC_FILE_3="${PROCESSED_DIR}/dev_processed_ablation_3.json"
 
 # [PROCESS DATA - STEP 3]
 poetry run python lc_nl2sql/data_process/sql_data_process.py \
