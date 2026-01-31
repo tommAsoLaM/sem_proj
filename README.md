@@ -1,6 +1,6 @@
 # KV Cache Compression for Text-to-SQL with LLMs
 
-This project implements and evaluates **KV Cache Compression** techniques (specifically **FinchPress/ExpectedAttentionPress** via NVIDIA's KVPress toolkit) for **Text-to-SQL** tasks. The goal is to mitigate the "Lost in the Middle" phenomenon in Large Language Models (LLMs) when handling long prompts containing complex database schemas, instance values, and few-shot examples.
+This project implements and evaluates **KV Cache Compression** techniques (specifically **FinchPress/ExpectedAttentionPress** via [NVIDIA's KVPress toolkit](https://github.com/NVIDIA/kvpress) for **Text-to-SQL** tasks. The goal is to mitigate the "Lost in the Middle" phenomenon in Large Language Models (LLMs) when handling long prompts containing complex database schemas, instance values, and few-shot examples.
 
 We leverage local LLMs (e.g., **Llama-3.2-1B-Instruct**, **Qwen2.5**) and compare performance against uncompressed baselines on benchmarks like **BIRD**, **Spider**, **KaggleDBQA**, and **Beaver**.
 
