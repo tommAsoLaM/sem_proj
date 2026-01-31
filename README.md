@@ -117,7 +117,7 @@ This step loads the LLM (and KVPress if enabled), generates SQL queries, execute
 poetry run python lc_nl2sql/predict/predict.py \
   --predicted_input_filename "lc_nl2sql/data/bird/dev/dev_processed.json" \
   --num_beams 1 \
-  --temperature 0.1 \
+  --temperature 0.0 \
   --use_self_correction 1 \
   --use_disambiguation 0 \
   --db_folder_path lc_nl2sql/data/bird/dev/dev_databases \
@@ -187,4 +187,5 @@ Finished evaluation
 *   **Solution:** The code automatically falls back to standard generation. This is a warning, not a fatal error.
 
 ### 3. `ModuleNotFoundError: No module named 'kvpress'`
+
 *   **Solution:** Ensure you installed the library: `pip install kvpress`.
