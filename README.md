@@ -116,7 +116,7 @@ This step loads the LLM (and KVPress if enabled), generates SQL queries, execute
 
 ```bash
 poetry run python lc_nl2sql/predict/predict.py \
-      --predicted_input_filename "lc_nl2sql/data/bird/dev/dev_processed_demo.json" \
+      --predicted_input_filename "lc_nl2sql/data/bird/dev/dev_processed.json" \
       --num_beams 1 \
       --temperature 0 \
       --use_self_correction 0 \
