@@ -1,6 +1,6 @@
 # KV Cache Compression for Text-to-SQL with LLMs
 
-This project implements and evaluates **KV Cache Compression** techniques (specifically **Finch/KnuthPress** via NVIDIA's KVPress toolkit) for **Text-to-SQL** tasks. The goal is to mitigate the "Lost in the Middle" phenomenon in Large Language Models (LLMs) when handling long prompts containing complex database schemas, instance values, and few-shot examples.
+This project implements and evaluates **KV Cache Compression** techniques (specifically **FinchPress/ExpectedAttentionPress** via NVIDIA's KVPress toolkit) for **Text-to-SQL** tasks. The goal is to mitigate the "Lost in the Middle" phenomenon in Large Language Models (LLMs) when handling long prompts containing complex database schemas, instance values, and few-shot examples.
 
 We leverage local LLMs (e.g., **Llama-3.2-1B-Instruct**, **Qwen2.5**) and compare performance against uncompressed baselines on benchmarks like **BIRD**, **Spider**, **KaggleDBQA**, and **Beaver**.
 
@@ -81,7 +81,7 @@ The project configuration is modularized under [`lc_nl2sql/configs`](lc_nl2sql/c
 ### Key Parameters
 When running scripts, you can control the behavior using command-line arguments:
 
-*   `--use_kvpress`: **[NEW]** Enable KV Cache Compression (e.g., SnapKV, Finch).
+*   `--kvpress`: **[NEW]** Enable KV Cache Compression (e.g., FinchPress, ExpectedAttentionPress).
 *   `--model_name_or_path`: Path or HuggingFace ID of the model (e.g., `meta-llama/Llama-3.2-1B-Instruct`).
 *   `--num_beams`: Number of retries/candidates for Self-Correction (e.g., `1` for speed, `5` for accuracy).
 *   `--use_self_correction`: Enable automatic error correction if the generated SQL fails execution.
@@ -103,11 +103,12 @@ poetry run python lc_nl2sql/data_process/sql_data_process.py \
   --input_table_path lc_nl2sql/data/bird/dev/dev_tables.json \
   --output_file_path "lc_nl2sql/data/bird/dev/dev_processed.json" \
   --db_folder_path lc_nl2sql/data/bird/dev/dev_databases \
-  --num_col_values 3 \
-  --use_hint 1 \
-  --use_column_filtering 1 \
+  --num_col_values 0 \
+  --use_hint 0 \
+  --use_rules 0 \
+  --use_column_filtering 0 \
   --synthetic_examples 1 \
-  --num_examples 3
+  --num_examples 0
 ```
 
 ### 2. Prediction / Inference (`predict.py`)
@@ -115,16 +116,15 @@ This step loads the LLM (and KVPress if enabled), generates SQL queries, execute
 
 ```bash
 poetry run python lc_nl2sql/predict/predict.py \
-  --predicted_input_filename "lc_nl2sql/data/bird/dev/dev_processed.json" \
-  --num_beams 1 \
-  --temperature 0.0 \
-  --use_self_correction 1 \
-  --use_disambiguation 0 \
-  --db_folder_path lc_nl2sql/data/bird/dev/dev_databases \
-  --predicted_out_filename "lc_nl2sql/output/pred/bird_results" \
-  --finetuning_type lora \
-  --stage sft \
-  --use_kvpress 1
+      --predicted_input_filename "lc_nl2sql/data/bird/dev/dev_processed_demo.json" \
+      --num_beams 1 \
+      --temperature 0 \
+      --use_self_correction 0 \
+      --use_disambiguation 0 \
+      --kvpress "FinchPress" \
+      --compression_ratio 0.6 \
+      --db_folder_path lc_nl2sql/data/bird/dev/dev_databases \
+      --predicted_out_filename "predicted_demo"
 ```
 
 ---
@@ -158,7 +158,14 @@ After generating predictions, use the evaluation scripts to calculate **Executio
 
 ```bash
 # Example for BIRD
-poetry run bash lc_nl2sql/scripts/process_bird_output.sh bird_results lc_nl2sql/output/pred/
+poetry run python lc_nl2sql/third_party/db_gpt_hub_sql/eval/evaluation_bird.py \
+            --predicted_sql_path "predicted_demo" \
+            --ground_truth_path "lc_nl2sql/data/bird/dev/dev.sql" \
+            --db_root_path "lc_nl2sql/data/bird/dev/dev_databases/" \
+            --diff_json_path "lc_nl2sql/data/bird/dev/dev.json" \
+            --output_csv_path "sql_comparison_demo.csv" \
+            --num_cpus 8 \
+            --etype all
 ```
 
 **Output Example:**
