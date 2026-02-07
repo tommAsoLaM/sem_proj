@@ -32,6 +32,9 @@ from lc_nl2sql.configs.config import EXAMPLE_GENERATOR, EXAMPLE_GENERATOR2
 from typing import List, Dict
 from lc_nl2sql.llm_base.api_model import GeminiModel
 from lc_nl2sql.predict.predict import prepare_dataset
+from lc_nl2sql.llm_base.model import BaseModel
+from new_files.offline_model import OfflineModel
+import logging
 
 
 def measure(
@@ -46,14 +49,14 @@ def measure(
             latency = time.time() - start_time
             return latency, token
         except Exception as e:
-            loging.error(e)
+            logging.error(e)
             return 0, 0
     try:
         return func_timeout(300, _task, args=())
     except FunctionTimedOut:
         return 0, 0
 
-def measure_latency(model: GeminiModel, predict_data: List[Dict], n=100, use_flash=False):
+def measure_latency(model: BaseModel, predict_data: List[Dict], n=100, use_flash=False):
     
     toks, latency = [], []
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -81,7 +84,7 @@ def measure_latency(model: GeminiModel, predict_data: List[Dict], n=100, use_fla
     return toks, latency
 
 
-def predict(model: GeminiModel):
+def predict(model: BaseModel):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
     predict_data = prepare_dataset(args.predicted_input_filename)
@@ -94,6 +97,6 @@ def predict(model: GeminiModel):
 
 
 if __name__ == "__main__":
-    model = GeminiModel()
+    model = OfflineModel()
     model._infer_args()
     predict(model)

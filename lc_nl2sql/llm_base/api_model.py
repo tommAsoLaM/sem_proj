@@ -34,20 +34,19 @@ from transformers import HfArgumentParser
 
 import vertexai
 from vertexai.generative_models import GenerativeModel
-
+from lc_nl2sql.llm_base.model import BaseModel
 
 import logging
 
 logging.basicConfig(level=logging.INFO)
 
 
-class GeminiModel:
+class GeminiModel(BaseModel):
 
     def __init__(self, project_id="400355794761") -> None:
         vertexai.init(project=project_id, location="us-central1")
         self.model = GenerativeModel(model_name="gemini-1.5-pro-002")  # preview-0514
-        self.model2 = GenerativeModel(
-            model_name="gemini-1.5-flash-002")
+        self.model2 = GenerativeModel(model_name="gemini-1.5-flash-002")
         self.ignore_hints = False
 
     def _infer_args(self, args: Optional[Dict[str, Any]] = None):

@@ -60,6 +60,11 @@ logger = logging
 
 
 def extract_sql_prompt_dataset(example: Dict[str, Any]) -> Dict[str, str]:
+    # If data is already processed (has 'instruction' and 'input'), return as-is
+    if "instruction" in example and "input" in example:
+        return {"input": example["instruction"] + example["input"]}
+    
+    # Otherwise apply format template (for backward compatibility)
     if example.get("input", "") != "":
         prompt_format = SQL_PROMPT_DICT["prompt_no_prefix"]
     else:

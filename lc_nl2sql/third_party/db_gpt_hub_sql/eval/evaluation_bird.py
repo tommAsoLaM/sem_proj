@@ -185,10 +185,16 @@ def run_sqls_parallel(sqls, db_places, num_cpus=1, meta_time_out=30.0, gt_tied_q
     pool = mp.Pool(processes=num_cpus)
     for i, sql_pair in enumerate(sqls):
         predicted_sql, ground_truth = sql_pair
+        
+        gt_tied_sql = "" 
+
         if gt_tied_queries:
+            # Fill in gt_tied_sql if available
             gt_tied_sql = gt_tied_queries[i] if i in gt_tied_queries else ""
+            
         pool.apply_async(
             execute_model,
+            # fill in the arguments
             args=(predicted_sql, ground_truth, db_places[i], i, meta_time_out, gt_tied_sql, multi_sql_mode),
             callback=result_callback,
         )
@@ -310,8 +316,12 @@ if __name__ == "__main__":
     args_parser.add_argument("--sql_candidates_path", type=str, default="")
     args_parser.add_argument("--multi_sql_mode", type=str, default="upper")  # upper, lower, average
     args_parser.add_argument("--n_cands", type=int, default=-1)
+    
+    # Added argument for output CSV path
+    args_parser.add_argument("--output_csv_path", type=str, default="evaluation_result.csv", help="Path to save the evaluation result CSV")
 
     args = args_parser.parse_args()
+    print(f"Evaluating predicted SQL file: {args.predicted_sql_path}")
     exec_result = []
 
     if args.sql_candidates_path:
@@ -393,6 +403,41 @@ if __name__ == "__main__":
         ) = compute_acc_by_diff(exec_result, args.diff_json_path, "time_ratio")
         score_lists = [simple_acc, moderate_acc, challenging_acc, acc]
         print_data(score_lists, count_lists, metric="Ves")
+    
+    # Save detailed results to CSV if output path is provided
+    if args.output_csv_path:
+        print(f"Saving detailed results to {args.output_csv_path}...")
+        try:
+            with open(args.output_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                # Tulis Header
+                writer.writerow(["Ground Truth SQL", "Predicted SQL", "Result (1=Correct, 0=Incorrect)"])
+
+                # exec_result has been sorted based on sql_idx, so the order matches query_pairs (0, 1, 2...)
+                # query_pairs is a list of tuples: (predicted_sql, ground_truth)
+                for i, res_dict in enumerate(exec_result):
+                    # Get SQL from query_pairs using index i
+                    pred_sql = query_pairs[i][0]
+                    gt_sql = query_pairs[i][1]
+                    
+                    # Get evaluation result. 
+                    # If etype='match', take 'match'. If 'exec'/'all', take 'res'.
+                    # By default, we take 'res' (execution result) because it is the most accurate, 
+                    # unless the user only requests match.
+                    if args.etype == 'match':
+                        result_status = res_dict.get('match', 0)
+                    else:
+                        result_status = res_dict.get('res', 0)
+
+                    # If pred_sql is a list (multi-sql mode), convert it to a string for neatness in the CSV
+                    if isinstance(pred_sql, list):
+                        pred_sql = str(pred_sql)
+
+                    writer.writerow([gt_sql, pred_sql, result_status])
+            print("CSV saved successfully.")
+        except Exception as e:
+            print(f"Error saving CSV: {e}")
+
     print(
         "==========================================================================================="
     )

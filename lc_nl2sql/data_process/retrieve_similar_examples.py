@@ -27,6 +27,8 @@ import vertexai
 from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
 import argparse
 from pathlib import Path
+from lc_nl2sql.llm_base.api_model import BaseModel
+from sentence_transformers import SentenceTransformer
 
 # Usage
 # python lc_nl2sql/data_process/retrieve_similar_examples.py \ 

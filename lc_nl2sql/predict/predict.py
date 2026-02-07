@@ -21,19 +21,16 @@ import time
 import re
 import random
 import pickle
-
-from func_timeout import func_timeout, FunctionTimedOut
-
-ROOT_PATH = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(ROOT_PATH)
-
+import argparse
 from tqdm import tqdm
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from func_timeout import func_timeout, FunctionTimedOut
 
 from lc_nl2sql.third_party.db_gpt_hub_sql.data_process.data_utils import extract_sql_prompt_dataset
 from lc_nl2sql.llm_base.api_model import GeminiModel
+from lc_nl2sql.llm_base.offline_model import OfflineModel
+from lc_nl2sql.llm_base.model import BaseModel
 
 
 def prepare_dataset(predict_file_path: Optional[str] = None, ) -> List[Dict]:
@@ -91,11 +88,15 @@ def inference_worker(
     except FunctionTimedOut:
         return ("", 0, 0, 0, 0, 0, 0)
 
-def parallelized_inference(model: GeminiModel, predict_data: List[Dict],
+def parallelized_inference(model: BaseModel, predict_data: List[Dict],
                            **input_kwargs):
-    num_threads = 50
-    if model.generating_args.num_beams > 10:
-        num_threads = 10
+
+    # change from 50 to 1, because for local model, high number of threads will cause overload
+    num_threads = 1 
+    
+    # deactivate the old code for num_beams limitation
+    # if model.generating_args.num_beams > 10:
+    #     num_threads = 10
 
     res_dict = {}
     extra_tokens, n_tries, latency, verify_latency = [], [], [], []
@@ -152,7 +153,39 @@ def parallelized_inference(model: GeminiModel, predict_data: List[Dict],
     return [res_dict[i] for i in range(len(predict_data))], extra_tokens, n_tries, latency, verify_latency, e2e_latency
 
 
-def predict(model: GeminiModel, dump_file=True):
+def clean_output(sql_content):
+    if not sql_content:
+        return ""
+    
+    # [NEW CODE START] Check for XML tags first
+    tag_match = re.search(r"<FINAL_SQL>\s*(.*?)\s*</FINAL_SQL>", sql_content, re.DOTALL | re.IGNORECASE)
+    if tag_match:
+        return tag_match.group(1).strip()
+    # [NEW CODE END]
+
+    # Delete markdown code blocks if there is (```sql ... ```
+    sql_content = re.sub(r'```sql', '', sql_content)
+    sql_content = re.sub(r'```', '', sql_content)
+
+    # Strategy 1: Find pattern SELECT ... ;
+    # This will capture a string that starts with SELECT and ends with;
+    # The re.IGNORECASE flag makes it case-insensitive
+    # The re.DOTALL flag allows the dot (.) to match newlines (multiline SQL)
+    match = re.search(r"(SELECT.*?;)", sql_content, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # Strategy 2: If there is no semicolon (;), try to take the last line that looks like SQL
+    # or use old marker cleaning as a fallback
+    markers = ["###", "Let's verify", "Let’s verify", "Explanation:", "Analysis:"]
+    for marker in markers:
+        if marker in sql_content:
+            sql_content = sql_content.split(marker)[0]
+            
+    return sql_content.strip()
+
+
+def predict(model: BaseModel, dump_file=True):
     args = model.data_args
     ## predict file can be give by param --predicted_input_filename ,output_file can be gived by param predicted_out_filename
     predict_data = prepare_dataset(args.predicted_input_filename)
@@ -162,7 +195,12 @@ def predict(model: GeminiModel, dump_file=True):
         with open(args.predicted_out_filename, "w") as f:
             for p in result:
                 try:
-                    f.write(p.replace("\n", " ") + "\n")
+                    # [MODIFIED] Uncomment clean_output to ensure clean SQL
+                    cleaned_p = clean_output(p)
+                    f.write(cleaned_p.replace("\n", " ") + "\n")
+                    
+                    # [OLD] Write raw output directly
+                    # f.write(p.replace("\n", " ") + "\n")
                 except:
                     f.write("Invalid Output!\n")
         if model.measure_self_correction_tokens:
@@ -189,6 +227,6 @@ def predict(model: GeminiModel, dump_file=True):
 
 
 if __name__ == "__main__":
-    model = GeminiModel()
+    model = OfflineModel()
     model._infer_args()
     predict(model)

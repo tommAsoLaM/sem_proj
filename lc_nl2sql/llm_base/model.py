@@ -1,0 +1,54 @@
+import abc
+
+from abc import ABC, abstractmethod
+from typing import Dict, Generator, List, Optional, Tuple, Any
+
+class BaseModel(ABC):
+    """Abstract base class for language models (both API-based and offline)."""
+    
+    def __init__(self, model_name: str) -> None:
+        pass
+        
+    @abstractmethod
+    def _infer_args(self, args: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize model arguments and configuration."""
+        pass
+
+    @abstractmethod
+    def load_model(self) -> None:
+        """Load the model and tokenizer."""
+        pass
+
+    @abstractmethod
+    def chat(self,
+             query: str,
+             history: Optional[List[Tuple[str, str]]] = None,
+             system: Optional[str] = None,
+             **input_kwargs) -> Tuple[str, Tuple[int, int]]:
+        """Generate a response for the given query."""
+        pass
+
+    @abstractmethod
+    def stream_chat(self,
+                   query: str, 
+                   history: Optional[List[Tuple[str, str]]] = None,
+                   system: Optional[str] = None,
+                   **input_kwargs) -> Generator[str, None, None]:
+        """Stream the response for the given query."""
+        pass
+
+    @abstractmethod
+    def verify_and_correct(self, 
+                          query: str,
+                          sql: str,
+                          db_folder_path: str,
+                          qid: int,
+                          return_invalid: bool = True,
+                          use_flash: bool = False) -> Tuple[str, int, int]:
+        """Verify and correct generated SQL queries."""
+        pass
+
+    @abstractmethod
+    def majority_voting(self, query: str, candidates: List[str]) -> str:
+        """Perform majority voting on multiple candidate responses."""
+        pass

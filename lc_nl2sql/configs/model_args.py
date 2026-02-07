@@ -43,7 +43,7 @@ class ModelArguments:
     use_auth_token: Optional[bool] = field(
         default=False,
         metadata={
-            "help": "Will use the token generated when running `huggingface-cli login`."
+            "help": "Will use the token generated when running ⁠ huggingface-cli login ⁠."
         },
     )
     model_revision: Optional[str] = field(
@@ -107,7 +107,7 @@ class ModelArguments:
         },
     )
 
-    def __post_init__(self):
+    def _post_init_(self):
 
         if self.checkpoint_dir is not None:  # support merging multiple lora weights
             self.checkpoint_dir = [cd.strip() for cd in self.checkpoint_dir.split(",")]
@@ -163,6 +163,19 @@ class GeneratingArguments:
             "help":
             "Whether or not to measure and record additional tokens used for self-correction loop."
         },
+    )
+    
+    use_kvpress: bool = field(
+        default=True,
+        metadata={"help": "Enable KVPress acceleration/compression."}
+    )
+    kvpress: Optional[str] = field(
+        default=None,
+        metadata={"help": "KVPress policy: FinchPress or ExpectedAttentionPress."}
+    )
+    compression_ratio: float = field(
+        default=0.4,
+        metadata={"help": "KVPress compression ratio (0-1)."}
     )
     use_flash: Optional[bool] = field(
         default=False,
@@ -242,14 +255,15 @@ class GeneratingArguments:
 
 @dataclass
 class FinetuningArguments:
-    r"""
-    Arguments pertaining to which techniques we are going to fine-tuning with.
+    """
+    Arguments pertaining to which techniques we are going to use for training.
     """
     stage: Optional[Literal["sft", "rm"]] = field(
         default="sft", metadata={"help": "Which stage will be performed in training."}
     )
-    finetuning_type: Optional[Literal["lora", "freeze", "full", "none"]] = field(
-        default="lora", metadata={"help": "Which fine-tuning method to use."}
+    per_device_eval_batch_size: Optional[int] = field(
+        default=2,
+        metadata={"help": "Batch size per device for evaluation."}
     )
     num_hidden_layers: Optional[int] = field(
         default=32,
@@ -320,8 +334,12 @@ class FinetuningArguments:
     dpo_beta: Optional[float] = field(
         default=0.1, metadata={"help": "The beta parameter for the DPO loss."}
     )
+    finetuning_type: str = field(
+        default="lora",
+        metadata={"help": "The name of the finetuning technique."}
+    )
 
-    def __post_init__(self):
+    def _post_init_(self):
         if isinstance(
             self.lora_target, str
         ):  # support custom target modules/layers of LoRA
@@ -351,15 +369,14 @@ class FinetuningArguments:
         ], "Invalid fine-tuning method."
 
     def save_to_json(self, json_path: str):
-        r"""Saves the content of this instance in JSON format inside `json_path`."""
+        r"""Saves the content of this instance in JSON format inside ⁠ json_path ⁠."""
         json_string = json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
         with open(json_path, "w", encoding="utf-8") as f:
             f.write(json_string)
 
     @classmethod
     def load_from_json(cls, json_path: str):
-        r"""Creates an instance from the content of `json_path`."""
+        r"""Creates an instance from the content of ⁠ json_path ⁠."""
         with open(json_path, "r", encoding="utf-8") as f:
             text = f.read()
         return cls(**json.loads(text))
-
