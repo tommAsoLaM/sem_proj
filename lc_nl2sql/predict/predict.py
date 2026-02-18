@@ -112,7 +112,7 @@ def parallelized_inference(model: BaseModel, predict_data: List[Dict],
         n_completed = 0
         try:
             for future in tqdm(as_completed(futures,
-                                            timeout= 3600 * 3),
+                                            timeout= 3600 * 30),
                                total=len(futures),
                                desc="Inference Progress",
                                unit="item"):

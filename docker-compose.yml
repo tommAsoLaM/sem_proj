@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  text2sql-rocm:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocm
+    container_name: text2sql-rocm
+    
+    # Mount GPU AMD ke container
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    
+    # Group permissions untuk akses GPU
+    group_add:
+      - video
+      - render
+    
+    # Volumes untuk persistence
+    volumes:
+      # Mount source code (agar perubahan langsung terlihat)
+      - ./lc_nl2sql:/app/lc_nl2sql
+      # Mount data
+      - ./lc_nl2sql/data:/app/lc_nl2sql/data
+      # Mount untuk menyimpan hasil prediksi
+      - ./predicted_demo:/app/predicted_demo
+      # Cache Hugging Face models (agar tidak download ulang)
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    
+    # Environment variables
+    environment:
+      - ROCM_HOME=/opt/rocm
+      - HIP_VISIBLE_DEVICES=0  # GPU index, ubah jika multi-GPU
+      - HSA_OVERRIDE_GFX_VERSION=12.0.1  # Sesuaikan dengan GPU Anda
+      - PYTORCH_ROCM_ARCH=gfx1201  # Sesuaikan dengan GPU Anda
+    
+    # Shared memory untuk PyTorch DataLoader
+    shm_size: '32gb'
+    
+    # Keep container running
+    stdin_open: true
+    tty: true
+    
+    # Network mode
+    network_mode: host
+
+    # Working directory
+    working_dir: /app

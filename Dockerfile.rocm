@@ -1,0 +1,57 @@
+# =============================================================================
+# Dockerfile untuk Text2SQL dengan ROCm AMD GPU
+# =============================================================================
+
+# 1. Gunakan base image ROCm resmi dari AMD
+#    Pilih versi ROCm sesuai dengan yang terinstall di host (cek dengan: rocminfo)
+FROM docker.io/rocm/pytorch:latest
+
+# 2. Set environment variables untuk ROCm
+ENV ROCM_HOME=/opt/rocm
+ENV PATH="${ROCM_HOME}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${ROCM_HOME}/lib:${LD_LIBRARY_PATH}"
+ENV HSA_OVERRIDE_GFX_VERSION=12.0.1
+# ^ Sesuaikan dengan GPU Anda (misal: gfx1030 untuk RX 6800, gfx1100 untuk RX 7900)
+
+# 3. Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    sqlite3 \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Upgrade pip
+RUN pip install --upgrade pip
+
+# 5. Set working directory
+WORKDIR /app
+
+# 6. Copy dependency files
+COPY pyproject.toml poetry.lock* ./
+
+# 7. Install Poetry
+RUN pip install poetry poetry-plugin-export
+
+# PENTING: Exclude torch, torchvision, torchaudio, triton, dan semua nvidia-*
+RUN poetry export -f requirements.txt --without-hashes -o requirements.txt \
+    && grep -v -E "flash-attn|bitsandbytes|^torch|torchvision|torchaudio|triton|nvidia-|cuda-" requirements.txt > requirements_rocm.txt \
+    && pip install --no-cache-dir -r requirements_rocm.txt
+
+
+# 9. Install PyTorch untuk ROCm (pastikan versi sesuai)
+#    Base image sudah include PyTorch, tapi jika perlu upgrade:
+#RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0
+
+# 10. Install bitsandbytes untuk ROCm (community fork)
+RUN pip install bitsandbytes-rocm || echo "bitsandbytes-rocm not available, skipping..."
+
+# 11. Copy seluruh project
+COPY . .
+
+# 12. Install project dalam mode editable
+RUN pip install -e . --no-deps
+
+# 13. Set default command
+CMD ["bash"]
