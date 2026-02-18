@@ -17,3 +17,4 @@ db_tbl_col_vals_bird.pickle
 db_tbl_col_vals_bird.pickle
 db_tbl_col_vals_bird.pickle
 .DS_Store
+.poetry.lock
